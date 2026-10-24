@@ -12,9 +12,10 @@ set -euo pipefail
 PI_USER="${SUDO_USER:-pi}"
 INSTALL_DIR="/home/${PI_USER}/qr-system"
 SERVICE_NAME="innosaw-thin"
+REPO_BASE="https://raw.githubusercontent.com/Steven-McWilliams/Shop-Thin-Installer/main"
 
-# This installer is intentionally self-contained. It installs the public Thin Pi runtime
-# files packaged within the public bootstrap repo itself and does not clone a private repo.
+# A raw file download only contains this script. Fetch the runtime files from the
+# public repo explicitly so this works on a fresh Raspberry Pi without a git clone.
 
 echo "[1/5] Installing required packages"
 apt-get update -y
@@ -23,21 +24,10 @@ apt-get install -y python3 python3-venv python3-pip python3-dev build-essential 
 mkdir -p "${INSTALL_DIR}"
 chown -R "${PI_USER}:${PI_USER}" "${INSTALL_DIR}"
 
-# Copy the minimal Thin Pi runtime files from this public bootstrap repo.
-# The public repo should contain only the files necessary for Thin Pi install/run.
-INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-for src in \
-  "${INSTALLER_DIR}/thin_pi_runtime.py" \
-  "${INSTALLER_DIR}/requirements.txt" \
-  "${INSTALLER_DIR}/innosaw-thin.service" \
-  "${INSTALLER_DIR}/config.example.json"; do
-  if [[ -f "${src}" ]]; then
-    cp "${src}" "${INSTALL_DIR}/$(basename "${src}")"
-  else
-    echo "Missing required bootstrap file: ${src}"
-    exit 1
-  fi
+for file in thin_pi_runtime.py requirements.txt innosaw-thin.service config.example.json; do
+  final_path="${INSTALL_DIR}/${file}"
+  echo "Downloading ${file}"
+  curl -fsSL "${REPO_BASE}/${file}" -o "${final_path}"
 done
 
 chown -R "${PI_USER}:${PI_USER}" "${INSTALL_DIR}"
@@ -72,4 +62,4 @@ echo ""
 echo "Service status: sudo systemctl status ${SERVICE_NAME} --no-pager"
 echo "Admin UI: http://<pi-ip>:5006/admin"
 echo ""
-echo "This public repo intentionally contains only the minimal Thin Pi install/runtime files."
+echo "This public repo intentionally contains only the minimal Thin Pi install/runtime files and no private app dependency."
