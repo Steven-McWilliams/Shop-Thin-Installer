@@ -1,0 +1,11 @@
+{
+  "name": "Thin Pi",
+  "station_code": "THIN",
+  "cloud_url": "https://example.com",
+  "thin_mode": true,
+  "scanners": {},
+  "network": {
+    "host": "0.0.0.0",
+    "port": 5006
+  }
+}
