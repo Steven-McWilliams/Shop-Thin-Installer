@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Innosaw - Mobile Scan</title>
+  <link rel="stylesheet" href="/static/common.css?v=20251222">
+  <!-- html5-qrcode library for iOS/Safari compatibility -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    .card { max-width: 1200px; margin: 16px auto; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .mobile_grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1024px) {
+      .mobile_grid { grid-template-columns: 420px 1fr; align-items: start; }
+      .mobile_sidebar { position: sticky; top: 16px; }
+    }
+    video { width: 100%; max-height: 420px; border-radius: 10px; background: #000; }
+    #reader { width: 100%; max-height: 420px; border-radius: 10px; background: #000; }
+    #reader video { border-radius: 10px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .small { font-size:12px; color:#666; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#1f2937; font-size:12px; }
+    .station_badge { padding: 4px 12px; border-radius: 6px; background: #0d2137; color: #fff; font-weight: 900; font-size: 14px; }
+    .flash {
+      position: relative;
+    }
+    .flash-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+    .flash-overlay.on { opacity: 1; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: rgba(13,33,55,0.92);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      z-index: 2000;
+      display: none;
+      max-width: 92vw;
+      word-break: break-word;
+    }
+    .kiosk_grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 860px) { .kiosk_grid { grid-template-columns: 1fr 1fr; } }
+    .metric_card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .metric_title { font-weight: 900; color:#0d2137; margin-bottom:6px; display: flex; justify-content: space-between; align-items: center; }
+    .metric_row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
+    .metric_row:last-child { border-bottom:none; }
+    .metric_label { color:#475569; }
+    .metric_val { color:#0f172a; font-weight:900; }
+    .checklist_item { display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9; cursor: pointer; }
+    .checklist_item:last-child { border-bottom:none; }
+    .checklist_item input { margin: 0; width: 18px; height: 18px; flex-shrink: 0; }
+    .checklist_item span { flex: 1; }
+    
+    /* Station-specific widget styles */
+    .assembly_row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+    .assembly_header { font-weight: bold; border-bottom: 2px solid #e2e8f0; }
+    .bin_large { font-size: 72px; font-weight: 900; text-align: center; color: #2563eb; margin: 10px 0; }
+    .bin_box { transition: all 0.2s; border: 1px solid #ddd; padding: 5px; text-align: center; border-radius: 4px; }
+    .cnc_active { background: #f0fdf4; border-color: #22c55e; }
+    
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+    select, input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; width: 100%; font-size: 14px; }
+    .btn-group { display: flex; gap: 8px; }
+    .btn-group .btn { flex: 1; }
+    
+    .kiosk_only { display: none; }
+    body.kiosk_mode .kiosk_only { display: block; }
+    body.kiosk_mode .no_kiosk { display: none; }
+    
+    /* Layout switch for kiosk vs mobile */
+    @media (max-width: 1023px) {
+      .mobile_grid { display: flex; flex-direction: column; }
+      .mobile_sidebar { order: 1; }
+      .mobile_main { order: 2; }
+      /* Move camera to top of sidebar when it's active on mobile */
+      .mobile_sidebar.camera_active { display: flex; flex-direction: column; }
+      .mobile_sidebar.camera_active .card:nth-child(2) { order: -1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📱 Mobile / Tablet Scan</h1>
+    <div class="subtitle">Select a station, scan with camera, and submit to cloud.</div>
+    <div class="nav_primary">
+      <a class="nav_btn active" href="/">Dashboard</a>
+      <a class="nav_btn" href="/reports">Reports</a>
+      <a id="shop_link" class="nav_btn" href="/">Office</a>
+      <a class="nav_btn" href="/labels">Labels</a>
+      <a class="nav_btn" href="/admin">Admin</a>
+      <a class="nav_btn" href="/help">Help</a>
+      <a class="nav_btn ext-link" data-port="5000" data-path="/" href="/bins">Bins</a>
+      <span class="nav_spacer"></span>
+      <a class="nav_btn" href="/login">Login</a>
+    </div>
+  </div>
+  <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+    <a class="nav_btn active" href="/mobile">Mobile Scan</a>
+    <a class="nav_btn" href="/maintenance">Maintenance</a>
+    <a class="nav_btn" href="/inventory">Inventory</a>
+    <a class="nav_btn" href="/tools">Tools</a>
+    <a class="nav_btn" href="/recuts">Recuts</a>
+  </div>
+
+  <div class="container">
+    <div class="mobile_grid">
+      <!-- Left Sidebar: Controls & Camera -->
+      <div class="mobile_sidebar">
+        <div class="card" style="margin-top:0;">
+          <div class="row" style="justify-content:space-between; margin-bottom:12px;">
+            <h2 style="margin:0;">⚙️ Setup</h2>
+            <div id="kiosk_toggle_wrap">
+              <button class="btn btn-secondary btn-sm" type="button" onclick="toggleKioskMode()" id="kiosk_mode_btn">Enter Kiosk</button>
+            </div>
+          </div>
+          
+          <div class="field">
+            <label>Station</label>
+            <select id="station" onchange="onStationChange()"></select>
+          </div>
+          
+          <div class="field">
+            <label>Operator</label>
+            <select id="operator"></select>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+            <button class="btn btn-secondary" onclick="stopCamera()">Stop</button>
+          </div>
+          
+          <div class="row" style="margin-top:12px; justify-content: space-between;">
+            <span class="small">Status: <span class="pill" id="status">Idle</span></span>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="pinStation()">Pin (Permanent)</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flash">
+            <div id="reader" style="display:none;"></div>
+            <video id="video" playsinline style="display:none;"></video>
+            <div id="flash" class="flash-overlay"></div>
+            <!-- Stop button inside the camera card for mobile usability -->
+            <button id="camera_stop_btn" class="btn btn-secondary" style="display:none; position:absolute; top:10px; right:10px; z-index:10; background:rgba(255,255,255,0.8); padding:8px 16px;" onclick="stopCamera()">Stop Camera</button>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label>Manual Entry</label>
+            <input id="manual" placeholder="Paste/Type scan and press Enter">
+          </div>
+          <div class="small" style="margin-top:8px;">
+            Tip: Camera works on iOS, Android, and modern browsers.
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Main: Station-Specific Kiosk / Recent Scans -->
+      <div class="mobile_main">
+        <!-- Kiosk View (Visible in Kiosk Mode) -->
+        <div id="kiosk_view" class="kiosk_only">
+          <div class="card" style="margin-top:0;">
+            <div class="row" style="justify-content:space-between; align-items:flex-start;">
+              <div>
+                <h2 style="margin:0;">📍 <span id="kiosk_station_name">Station</span></h2>
+                <div class="small">Live tracking for this station.</div>
+              </div>
+              <div class="row" style="gap:8px;">
+                <button class="btn btn-secondary btn-sm" id="layout_btn" type="button" onclick="openLayoutEditor()" style="display:none;">Edit widgets</button>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="toggleKioskMode()">Exit Kiosk</button>
+              </div>
+            </div>
+
+            <div id="kiosk_widgets" class="kiosk_grid" style="margin-top:12px;"></div>
+          </div>
+        </div>
+
+        <!-- Default View: Recent Scans -->
+        <div class="no_kiosk">
+          <div class="card" style="margin-top:0;">
+            <div class="metric_title">
+              Recent scans
+              <button class="btn btn-secondary btn-sm" onclick="refreshRecent()">Refresh</button>
+            </div>
+            <div id="recent" class="small">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Built-in widget templates (moved into #kiosk_widgets based on saved layout) -->
+  <div id="widget_templates" style="display:none;">
+    <div id="widget_last_scan" class="metric_card">
+      <div class="metric_title">Last scan</div>
+      <div id="last_scan" class="small">Loading…</div>
+    </div>
+
+    <div id="widget_today_metrics" class="metric_card">
+      <div class="metric_title">Today metrics</div>
+      <div id="kiosk_metrics">
+        <div class="metric_row"><div class="metric_label">Scans</div><div class="metric_val" id="m_scans">—</div></div>
+        <div class="metric_row"><div class="metric_label">Jobs</div><div class="metric_val" id="m_jobs">—</div></div>
+        <div class="metric_row"><div class="metric_label">Avg cycle</div><div class="metric_val" id="m_cycle">—</div></div>
+        <div class="metric_row"><div class="metric_label">Avg gap</div><div class="metric_val" id="m_gap">—</div></div>
+      </div>
+    </div>
+
+    <div id="widget_qc_checklist" class="metric_card">
+      <div class="metric_title">QC Checklist</div>
+      <div class="small" style="margin-bottom:8px;">Quick checks for current cabinet.</div>
+      <div id="qc_checklist"></div>
+      <div class="row" style="margin-top:10px;">
+        <input id="qc_note" placeholder="Notes (optional)" style="flex:1;">
+        <button class="btn btn-secondary btn-sm" type="button" onclick="saveQcChecklist()">Save</button>
+      </div>
+      <div class="small" id="qc_saved" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- New Station-Specific Widgets -->
+    <div id="widget_assembly_report" class="metric_card">
+      <div class="metric_title">
+        Assembly Today
+        <a href="/reports?tab=assembly" class="small" style="text-decoration: underline;">View All</a>
+      </div>
+      <div id="assembly_list">
+        <div class="assembly_row assembly_header">
+          <div>CABINET</div>
+          <div>SCANS</div>
+          <div>TIME</div>
+          <div></div>
+        </div>
+        <div id="assembly_rows_inner"></div>
+      </div>
+    </div>
+
+    <div id="widget_cnc_sheets" class="metric_card">
+      <div class="metric_title">CNC Sheet Status</div>
+      <div id="cnc_status_area" style="padding: 10px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 10px;">
+        <div class="small" id="cnc_current_material">No active sheet</div>
+        <div id="cnc_current_job" style="font-weight: 900; font-size: 16px;">Waiting for scan...</div>
+      </div>
+      
+      <div class="metric_title small" style="margin-top:12px; border-top:1px solid #f1f5f9; padding-top:8px;">Recent Sheets</div>
+      <div id="cnc_sheet_list">
+        <div class="assembly_row assembly_header">
+          <div>GCODE</div>
+          <div>MATERIAL</div>
+          <div>TIME</div>
+          <div></div>
+        </div>
+        <div id="cnc_sheet_rows_inner"></div>
+      </div>
+      
+      <div class="metric_row" style="margin-top:10px;">
+        <div class="metric_label">Total Today</div>
+        <div class="metric_val" id="cnc_sheets_today">0</div>
+      </div>
+    </div>
+
+    <div id="widget_cnc_material_approval" class="metric_card">
+      <div class="metric_title">Material Usage Approval</div>
+      <div class="small" style="margin-bottom:8px;">Review and approve materials scanned today.</div>
+      <div id="cnc_material_list" style="max-height: 300px; overflow: auto; border: 1px solid #f1f5f9; border-radius: 8px; padding: 10px;">
+        <div class="small">Loading material usage...</div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-primary" style="width:100%;" onclick="approveCncMaterials()">Approve All Today</button>
+      </div>
+      <div id="cnc_material_msg" class="small" style="margin-top:8px; text-align:center;"></div>
+    </div>
+
+    <div id="widget_sort_bins" class="metric_card">
+      <div class="metric_title">Sorting Assistant</div>
+      <div id="sort_bin_display">
+        <div id="sort_target_container">
+            <div class="small" style="text-align: center;">TARGET BIN</div>
+            <div class="bin_large" id="sort_target_bin">—</div>
+        </div>
+        <div id="sort_visual_container" style="display:none; margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+            <div class="small" style="text-align:center; margin-bottom:10px;">BIN STATUS</div>
+            <div id="sort_bin_grid" style="display:grid; gap:8px;"></div>
+        </div>
+        <div id="sort_table_container" style="display:none; margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+            <div class="small" style="text-align:center; margin-bottom:10px;">RECENT SORTED</div>
+            <div id="sort_bin_table" style="overflow-x:auto;"></div>
+        </div>
+        <div id="sort_bin_info" class="small" style="text-align: center; margin-bottom: 10px; margin-top:10px;">Scan a part to see its bin</div>
+        <button id="sort_approve_btn" class="btn btn-primary" style="display:none; width:100%;" onclick="approveSortToBin()">Approve & Move</button>
+      </div>
+    </div>
+
+    <div id="widget_sand_total" class="metric_card">
+      <div class="metric_title">Sanding Progress</div>
+      <div class="metric_row">
+        <div class="metric_label">Parts Today</div>
+        <div class="metric_val" id="sand_parts_today">0</div>
+      </div>
+      <div class="metric_row">
+        <div class="metric_label">Total SQFT</div>
+        <div class="metric_val" id="sand_sqft_today">0</div>
+      </div>
+      <div id="sand_parts_list" class="small" style="margin-top: 10px; max-height: 250px; overflow: auto;"></div>
+    </div>
+
+    <div id="widget_wrap_tracking" class="metric_card">
+      <div class="metric_title">Shipping/Wrap</div>
+      <div class="field">
+        <label>Pallet / Cart #</label>
+        <input id="wrap_pallet_num" placeholder="e.g. 104" onchange="saveWrapPallet()">
+      </div>
+      <div class="metric_row">
+        <div class="metric_label">Cabinets Wrapped</div>
+        <div class="metric_val" id="wrap_count_today">0</div>
+      </div>
+    </div>
+
+    <div id="widget_usage_note" class="metric_card" style="background: #fffbeb; border-color: #fde68a;">
+      <div class="metric_title" style="color: #92400e;">💡 Station Tracking Note</div>
+      <div id="usage_note_content" class="small" style="color: #92400e; font-weight: 500; line-height: 1.4;"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- Kiosk Layout Editor (admin-only) -->
+  <div id="layout_wrap" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:3000; align-items:center; justify-content:center;">
+    <div class="modal" style="background:#fff; border-radius:12px; max-width:980px; width:min(980px, calc(100vw - 28px)); max-height: min(86vh, 900px); overflow:auto; padding:14px;">
+      <div class="row" style="justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h2 style="margin:0;">🧰 Kiosk Layout Editor</h2>
+          <div class="small">Configure what a station kiosk shows (no code). Saved in cloud.</div>
+        </div>
+        <div class="row" style="gap:8px;">
+          <button class="btn btn-secondary" type="button" onclick="closeLayoutEditor()">Close</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px; align-items:flex-end;">
+        <div class="field" style="min-width: 320px;">
+          <label class="small">Edit layout for</label>
+          <select id="layout_target" style="min-width:320px;"></select>
+        </div>
+        <div class="field" style="min-width: 320px;">
+          <label class="small">Custom report (for widgets)</label>
+          <select id="layout_reports" style="min-width:320px;"></select>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; border-top:2px solid #eee; padding-top:14px;">
+        <div class="metric_title">Global Bin Dashboard (Monitor)</div>
+        <div class="small">Configure the layout for the static bin monitor page.</div>
+        <div class="row" style="margin-top:10px; gap:16px;">
+            <div class="field">
+                <label class="small">Total Bins</label>
+                <input type="number" id="layout_bin_count" style="width:100px;">
+            </div>
+            <div class="field">
+                <label class="small">Grid Columns</label>
+                <input type="number" id="layout_bin_cols" style="width:100px;">
+            </div>
+            <div class="field">
+                <label class="small">Grid Rows</label>
+                <input type="number" id="layout_bin_rows" style="width:100px;">
+            </div>
+            <div class="field">
+                <label class="small">Display Mode</label>
+                <select id="layout_bin_mode" style="min-width:160px;">
+                    <option value="standard">Standard (Visual + Parts)</option>
+                    <option value="compact">Compact (No Parts)</option>
+                    <option value="cabinet_only">Cabinet Number Only</option>
+                    <option value="simple_table">Simple Table</option>
+                </select>
+            </div>
+        </div>
+        <div class="row" style="margin-top:10px; gap:16px;">
+            <div class="field">
+                <label class="small">Bin # Size</label>
+                <input type="number" id="layout_bin_num_size" style="width:70px;" value="14">
+            </div>
+            <div class="field">
+                <label class="small">Content Size</label>
+                <input type="number" id="layout_bin_content_size" style="width:70px;" value="12">
+            </div>
+            <div class="field">
+                <label class="small">Status Size</label>
+                <input type="number" id="layout_bin_status_size" style="width:70px;" value="11">
+            </div>
+        </div>
+        <div class="row" style="margin-top:10px; gap:8px;">
+            <div class="field">
+                <label class="small">Ready</label>
+                <input type="color" id="layout_bin_color_ready" value="#059669" style="width:40px; height:28px; padding:2px;">
+            </div>
+            <div class="field">
+                <label class="small">Partial</label>
+                <input type="color" id="layout_bin_color_partial" value="#2563eb" style="width:40px; height:28px; padding:2px;">
+            </div>
+            <div class="field">
+                <label class="small">Mixed</label>
+                <input type="color" id="layout_bin_color_mixed" value="#d97706" style="width:40px; height:28px; padding:2px;">
+            </div>
+            <div class="field">
+                <label class="small">Empty</label>
+                <input type="color" id="layout_bin_color_empty" value="#1a1a2e" style="width:40px; height:28px; padding:2px;">
+            </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="metric_title">Widgets</div>
+        <div class="small">Order matters. “Half” makes a 2‑column layout on wide screens. “Full” spans both columns.</div>
+        <div id="layout_rows" style="margin-top:10px;"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-secondary" type="button" onclick="layoutAddRow()">Add widget</button>
+          <button class="btn btn-secondary" type="button" onclick="layoutPreview()">Preview</button>
+          <button class="btn btn-primary" type="button" onclick="layoutSave()">Save</button>
+        </div>
+        <div class="small" id="layout_msg" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <template id="tpl_custom_report">
+    <div class="metric_card" data-cr-card="1">
+      <div class="metric_title" data-cr-title>Custom report</div>
+      <div class="small" data-cr-msg></div>
+      <div data-cr-out style="margin-top:10px;"></div>
+    </div>
+  </template>
+
+  <script>
+    let html5QrcodeScanner = null;
+    let detector = null;
+    let stream = null;
+    let timer = null;
+    let isSubmitting = false;
+    let isScanning = false;
+    let _isKiosk = false;
+    let _autoKioskStations = ['assembly', 'cnc', 'sort', 'qc', 'sand', 'wrap', 'build', 'h08', 'h10'];
+
+    function setStatus(t) { document.getElementById('status').textContent = t; }
+    
+    // Rate limits / de-dupe
+    const MIN_SUBMIT_INTERVAL_MS = 900; // allow different scans quickly, but not 50x/sec
+    const DUPLICATE_WINDOW_MS = 2500;   // same code within this window is ignored
+    let lastSubmitAt = 0;
+    const recentMap = new Map(); // code -> lastSeenTs
+
+    function _trimRecent(now) {
+      for (const [k, ts] of recentMap.entries()) {
+        if ((now - ts) > DUPLICATE_WINDOW_MS) recentMap.delete(k);
+      }
+    }
+    function canAccept(val) {
+      const now = Date.now();
+      _trimRecent(now);
+      const last = recentMap.get(val);
+      if (last && (now - last) < DUPLICATE_WINDOW_MS) return false;
+      if ((now - lastSubmitAt) < MIN_SUBMIT_INTERVAL_MS) return false;
+      return true;
+    }
+    function markAccepted(val) {
+      const now = Date.now();
+      recentMap.set(val, now);
+      lastSubmitAt = now;
+    }
+
+    function flash(color) {
+      const el = document.getElementById('flash');
+      if (!el) return;
+      el.style.background = color || 'rgba(16,185,129,0.25)';
+      el.classList.add('on');
+      setTimeout(() => el.classList.remove('on'), 140);
+    }
+    function beep(ok) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = ok ? 880 : 220;
+        g.gain.value = 0.0001;
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start();
+        const now = ctx.currentTime;
+        g.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + (ok ? 0.10 : 0.18));
+        o.stop(now + (ok ? 0.12 : 0.20));
+        setTimeout(() => ctx.close().catch(()=>{}), 250);
+      } catch {}
+    }
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 1200);
+    }
+
+    let _authRole = 'viewer';
+    let _authEnabled = false;
+    let _kioskLayout = null;
+    let _customReportDefs = [];
+    let _customWidgets = []; // [{ el, key, stationCode }]
+    let _activeSortConfig = null;
+
+    function _qs() {
+      try { return new URLSearchParams(window.location.search || ''); } catch { return new URLSearchParams(); }
+    }
+    function _today() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    function _fmtSeconds(sec) {
+      if (sec === null || sec === undefined) return '—';
+      const s = Math.round(Number(sec) || 0);
+      if (!Number.isFinite(s)) return '—';
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s/60);
+      const r = s % 60;
+      return `${m}m ${r}s`;
+    }
+
+    async function refreshAuthStatus() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json().catch(() => ({}));
+        _authEnabled = !!data.enabled;
+        _authRole = (data.role || 'viewer').toString();
+      } catch {
+        _authEnabled = false;
+        _authRole = 'viewer';
+      }
+      const btn = document.getElementById('layout_btn');
+      if (btn) btn.style.display = ((!_authEnabled) || (_authRole === 'admin')) ? 'inline-flex' : 'none';
+    }
+
+    async function loadStations() {
+      try {
+        const res = await fetch('/api/admin/stations');
+        const data = await res.json();
+        const sel = document.getElementById('station');
+        sel.innerHTML = '';
+        (data.stations || []).forEach(s => {
+          const o = document.createElement('option');
+          o.value = s.station_code;
+          const name = s.display_name || s.station_code;
+          o.textContent = name;
+          o.dataset.profile = s.profile || '';
+          sel.appendChild(o);
+        });
+      } catch (e) { console.error("Failed to load stations", e); }
+    }
+
+    async function loadOperators() {
+      try {
+        const res = await fetch('/api/operators');
+        const data = await res.json();
+        const sel = document.getElementById('operator');
+        sel.innerHTML = '<option value="">(no operator)</option>';
+        (data.operators || []).forEach(op => {
+          const o = document.createElement('option');
+          o.value = op.operator_code;
+          o.textContent = op.display_name || op.operator_code;
+          sel.appendChild(o);
+        });
+      } catch (e) { console.error("Failed to load operators", e); }
+    }
+
+    function toggleKioskMode(force) {
+      if (force !== undefined) _isKiosk = force;
+      else _isKiosk = !_isKiosk;
+      
+      document.body.classList.toggle('kiosk_mode', _isKiosk);
+      document.getElementById('kiosk_mode_btn').textContent = _isKiosk ? 'Exit Kiosk' : 'Enter Kiosk';
+      
+      if (_isKiosk) {
+        // refreshKioskData will handle rendering if needed, 
+        // or onStationChange will handle it.
+        refreshKioskData();
+      }
+    }
+
+    async function onStationChange() {
+      const sel = document.getElementById('station');
+      const st = sel.value;
+      const opt = sel.options[sel.selectedIndex];
+      const stText = opt?.textContent || st;
+      const stLower = st.toLowerCase();
+      const profile = opt?.dataset.profile || '';
+      
+      const shouldAutoKiosk = _autoKioskStations.some(type => 
+        profile === type || stLower.includes(type)
+      );
+      if (shouldAutoKiosk && !_isKiosk) {
+        toggleKioskMode(true);
+      }
+      
+      document.getElementById('kiosk_station_name').textContent = stText;
+      
+      await refreshRecent();
+      await refreshLastScan();
+      await refreshKioskMetrics();
+      if (_isKiosk) renderKioskFromLayout();
+    }
+
+    async function refreshKioskData() {
+      if (!_isKiosk) return;
+      await Promise.all([
+        refreshLastScan(),
+        refreshKioskMetrics(),
+        refreshAssemblyKiosk(),
+        refreshCncKiosk(),
+        refreshSandKiosk(),
+        refreshWrapKiosk()
+      ]);
+    }
+
+    async function refreshAssemblyKiosk() {
+      const st = document.getElementById('station').value;
+      const inner = document.getElementById('assembly_rows_inner');
+      if (!inner) return;
+      
+      try {
+        const today = _today();
+        const res = await fetch(`/api/assembly_times?date_from=${today}&date_to=${today}&station=${encodeURIComponent(st)}`);
+        const data = await res.json();
+        const cycles = data.cycles || [];
+        
+        if (cycles.length === 0) {
+          inner.innerHTML = '<div class="small" style="padding:10px; text-align:center;">No assemblies today</div>';
+          return;
+        }
+        
+        inner.innerHTML = cycles.map(c => {
+          const name = c.cabinet_assembly || c.cabinet_name || 'Unknown';
+          const scans = c.scan_count || 0;
+          const time = _fmtSeconds(c.duration_seconds);
+          const pillClass = scans >= 2 ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;';
+          return `
+            <div class="assembly_row">
+              <div style="font-weight:bold;">${name}</div>
+              <div style="text-align:center;"><span class="pill" style="${pillClass}">${scans}</span></div>
+              <div style="text-align:right;">${time}</div>
+              <div></div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) { console.error("Assembly refresh failed", e); }
+    }
+
+    async function refreshCncKiosk() {
+      const st = document.getElementById('station').value;
+      const inner = document.getElementById('cnc_sheets_today');
+      if (!inner) return;
+      
+      try {
+        const res = await fetch(`/api/kiosk/cnc/status?station=${encodeURIComponent(st)}`);
+        const data = await res.json();
+        
+        inner.textContent = data.sheets_today || 0;
+        const jobEl = document.getElementById('cnc_current_job');
+        const matEl = document.getElementById('cnc_current_material');
+        const area = document.getElementById('cnc_status_area');
+        
+        if (data.active) {
+            jobEl.textContent = data.job_name || 'Active Job';
+            matEl.textContent = data.material_name || 'Unknown Material';
+            area.classList.add('cnc_active');
+        } else {
+            jobEl.textContent = 'Waiting for scan...';
+            matEl.textContent = 'No active sheet';
+            area.classList.remove('cnc_active');
+        }
+
+        const today = _today();
+        const sheetRes = await fetch(`/api/sheet_processing_times?date_from=${today}&date_to=${today}&station=${encodeURIComponent(st)}&limit=10`);
+        const sheetData = await sheetRes.json();
+        const cycles = sheetData.cycles || [];
+        const rowsInner = document.getElementById('cnc_sheet_rows_inner');
+        
+        if (rowsInner) {
+          if (cycles.length === 0) {
+            rowsInner.innerHTML = '<div class="small" style="padding:10px; text-align:center;">No sheets processed today</div>';
+          } else {
+            rowsInner.innerHTML = cycles.map(c => {
+              const gcode = c.gcode || 'Unknown';
+              const mat = c.material || '—';
+              const time = _fmtSeconds(c.duration_seconds);
+              return `
+                <div class="assembly_row">
+                  <div style="font-weight:bold; overflow:hidden; text-overflow:ellipsis;">${gcode}</div>
+                  <div style="overflow:hidden; text-overflow:ellipsis;">${mat}</div>
+                  <div style="text-align:right;">${time}</div>
+                  <div></div>
+                </div>
+              `;
+            }).reverse().join('');
+          }
+        }
+
+        // Refresh material approval list if widget exists
+        if (document.getElementById('widget_cnc_material_approval')?.offsetParent !== null) {
+            refreshCncMaterialUsage();
+        }
+      } catch (e) { console.error("CNC refresh failed", e); }
+    }
+
+    let _lastCncMaterialData = null;
+    let _inventoryMaterials = null;
+    let _materialAliases = null;
+    
+    async function loadInventoryMaterials() {
+        if (_inventoryMaterials) return _inventoryMaterials;
+        try {
+            const res = await fetch('/api/inventory/materials');
+            const data = await res.json();
+            _inventoryMaterials = data.materials || [];
+            return _inventoryMaterials;
+        } catch (e) {
+            console.error('Failed to load inventory materials', e);
+            return [];
+        }
+    }
+    
+    async function loadMaterialAliases() {
+        if (_materialAliases) return _materialAliases;
+        try {
+            const res = await fetch('/api/inventory/material_aliases');
+            const data = await res.json();
+            _materialAliases = data.aliases || [];
+            return _materialAliases;
+        } catch (e) {
+            console.error('Failed to load material aliases', e);
+            return [];
+        }
+    }
+    
+    async function refreshCncMaterialUsage() {
+        const listEl = document.getElementById('cnc_material_list');
+        const msgEl = document.getElementById('cnc_material_msg');
+        if (!listEl) return;
+        
+        // Load inventory materials and existing aliases (non-blocking)
+        await Promise.allSettled([
+            loadInventoryMaterials(),
+            loadMaterialAliases()
+        ]);
+        
+        try {
+            const today = _today();
+            const res = await fetch(`/api/inventory/sheet_usage_daily?ymd=${today}`);
+            const data = await res.json();
+            _lastCncMaterialData = data;
+            
+            if (data.approved) {
+                msgEl.innerHTML = `<span style="color:#059669; font-weight:800;">✓ Approved at ${new Date(data.approval.approved_at).toLocaleTimeString()}</span>`;
+            } else {
+                msgEl.textContent = '';
+            }
+            
+            if (!data.items || data.items.length === 0) {
+                listEl.innerHTML = '<div class="small" style="text-align:center; color:#999;">No materials logged today.</div>';
+                return;
+            }
+            
+            listEl.innerHTML = data.items.map((it, idx) => {
+                // Check if there's an existing alias for this material
+                const existingAlias = (_materialAliases || []).find(a => 
+                    a.variant_name === it.material_name && 
+                    (a.variant_thickness || '') === (it.material_thickness || '')
+                );
+                
+                // Build dropdown options from inventory materials
+                const materialOptions = (_inventoryMaterials || []).map(m => {
+                    const isSelected = existingAlias 
+                        ? (m.name === existingAlias.canonical_name && (m.thickness || '') === (existingAlias.canonical_thickness || ''))
+                        : (m.name === it.material_name);
+                    const selected = isSelected ? 'selected' : '';
+                    const matNameEsc = (m.name || '').replace(/"/g, '&quot;');
+                    const matThickEsc = (m.thickness || '').replace(/"/g, '&quot;');
+                    return `<option value="${matNameEsc}|${matThickEsc}" ${selected}>${matNameEsc} ${matThickEsc}</option>`;
+                }).join('');
+                
+                // Escape values for use in onclick attribute
+                const matNameEsc = (it.material_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                const matThickEsc = (it.material_thickness || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                
+                return `
+                <div style="padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;">${it.material_name || 'Unknown Material'}</div>
+                            <div class="small">${it.material_thickness || ''} ${it.sheet_w_in || ''}x${it.sheet_h_in || ''}</div>
+                          <div style="margin-top:4px;">
+                            <label class="small" style="display:block; margin-bottom:2px; color:#64748b;">Job:</label>
+                            <input
+                              type="text"
+                              value="${(it.job_name || '').replace(/"/g, '&quot;')}"
+                              style="width:100%; padding:4px; font-size:12px; border:1px solid #cbd5e1; border-radius:4px;"
+                              onchange="updateCncItemJob(${idx}, this.value)"
+                              placeholder="Job name">
+                          </div>
+                            <div style="margin-top:4px;">
+                                <label class="small" style="display:block; margin-bottom:2px; color:#64748b;">Deduct from inventory:</label>
+                                <select 
+                                    data-cnc-idx="${idx}" 
+                                    data-variant-name="${matNameEsc}"
+                                    data-variant-thickness="${matThickEsc}"
+                                    style="width:100%; padding:4px; font-size:12px; border:1px solid #cbd5e1; border-radius:4px;"
+                                    onchange="updateMaterialMapping(${idx}, this.dataset.variantName, this.dataset.variantThickness, this.value)">
+                                    <option value="">-- Use as-is: ${it.material_name} --</option>
+                                    ${materialOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div style="width:80px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                            <input type="number" 
+                                   value="${it.new_sheets}" 
+                                   data-cnc-idx="${idx}" 
+                                   style="width:60px; padding:4px; text-align:center; font-weight:900;" 
+                                   onchange="updateCncItemCount(${idx}, this.value)">
+                            <div class="small">sheets</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+        } catch (e) { console.error("Failed to refresh CNC material usage", e); }
+    }
+
+    function updateCncItemCount(idx, val) {
+        if (_lastCncMaterialData && _lastCncMaterialData.items[idx]) {
+            _lastCncMaterialData.items[idx].new_sheets = parseInt(val) || 0;
+        }
+    }
+
+    function updateCncItemJob(idx, val) {
+      if (_lastCncMaterialData && _lastCncMaterialData.items[idx]) {
+        const next = (val || '').toString().trim();
+        _lastCncMaterialData.items[idx].job_name = next || null;
+      }
+    }
+    
+    async function updateMaterialMapping(idx, variantName, variantThickness, mappedValue) {
+        if (!mappedValue) {
+            toast('Using material name as-is');
+            return;
+        }
+        
+        const [canonicalName, canonicalThickness] = mappedValue.split('|');
+        
+        try {
+            const res = await fetch('/api/inventory/material_aliases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    variant_name: variantName,
+                    canonical_name: canonicalName,
+                    variant_thickness: variantThickness || null,
+                    canonical_thickness: canonicalThickness || null
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+            
+            // Refresh the aliases cache
+            _materialAliases = null;
+            await loadMaterialAliases();
+            
+            toast(`✓ Mapped "${variantName}" → "${canonicalName}"`);
+        } catch (e) {
+            console.error('Failed to save material mapping', e);
+            toast('Error saving mapping: ' + e.message);
+        }
+    }
+
+    async function approveCncMaterials() {
+        if (!_lastCncMaterialData || !_lastCncMaterialData.items || _lastCncMaterialData.items.length === 0) {
+            toast('No materials to approve');
+            return;
+        }
+        if (_lastCncMaterialData.approved && !confirm('Already approved. Re-approve and update inventory?')) return;
+        
+        const today = _today();
+        const msgEl = document.getElementById('cnc_material_msg');
+        msgEl.textContent = 'Approving...';
+        
+        try {
+            const res = await fetch('/api/inventory/sheet_usage_daily/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ymd: today,
+                    items: _lastCncMaterialData.items
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+            
+            toast('Material usage approved');
+            refreshCncMaterialUsage();
+        } catch (e) {
+            msgEl.textContent = 'Error: ' + e.message;
+            toast('Approval failed');
+        }
+    }
+
+    async function refreshSandKiosk() {
+      const st = document.getElementById('station').value;
+      const countEl = document.getElementById('sand_parts_today');
+      const sqftEl = document.getElementById('sand_sqft_today');
+      const listEl = document.getElementById('sand_parts_list');
+      if (!countEl) return;
+
+      try {
+        const res = await fetch(`/api/kiosk/station_totals?station=${encodeURIComponent(st)}`);
+        const data = await res.json();
+        
+        countEl.textContent = data.count || 0;
+        if (sqftEl) sqftEl.textContent = (data.total_sqft || 0).toFixed(2);
+        
+        if (listEl && data.parts) {
+            listEl.innerHTML = data.parts.map(p => {
+                const durStr = p.duration_seconds ? ` (${_fmtSeconds(p.duration_seconds)})` : '';
+                const pillClass = p.scan_count >= 2 ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;';
+                const statusPill = `<span class="pill" style="${pillClass} padding:1px 6px; font-size:10px; margin-left:6px;">${p.scan_count >= 2 ? 'DONE' : 'IN PROGRESS'}</span>`;
+                
+                return `
+                <div style="border-bottom:1px solid #f1f5f9; padding:6px 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight:bold;">${p.cabinet_assembly || 'N/A'}: ${p.part_name || 'Part'}</div>
+                        <div class="small">${p.sqft || 0} sqft ${durStr}</div>
+                    </div>
+                    <div>${statusPill}</div>
+                </div>
+            `;}).join('');
+        }
+      } catch (e) { console.error("Sanding refresh failed", e); }
+    }
+
+    async function refreshWrapKiosk() {
+      const st = document.getElementById('station').value;
+      const countEl = document.getElementById('wrap_count_today');
+      if (!countEl) return;
+
+      try {
+        const res = await fetch(`/api/kiosk/station_totals?station=${encodeURIComponent(st)}`);
+        const data = await res.json();
+        countEl.textContent = data.count || 0;
+        
+        const palInp = document.getElementById('wrap_pallet_num');
+        if (palInp && !palInp.value) {
+            palInp.value = localStorage.getItem('innosaw_wrap_pallet') || '';
+        }
+      } catch (e) { console.error("Wrap refresh failed", e); }
+    }
+
+    function saveWrapPallet() {
+        const val = document.getElementById('wrap_pallet_num').value;
+        localStorage.setItem('innosaw_wrap_pallet', val);
+        toast('Pallet # saved');
+    }
+
+    function applySortConfig() {
+        if (!_activeSortConfig) return;
+        const mode = _activeSortConfig.bin_mode || 'simple';
+        const targetCont = document.getElementById('sort_target_container');
+        const visualCont = document.getElementById('sort_visual_container');
+        const tableCont = document.getElementById('sort_table_container');
+        
+        if (targetCont) targetCont.style.display = (mode === 'simple') ? 'block' : 'none';
+        if (visualCont) visualCont.style.display = (mode === 'visual') ? 'block' : 'none';
+        if (tableCont) tableCont.style.display = (mode === 'table') ? 'block' : 'none';
+        
+        if (mode === 'visual') {
+            const grid = document.getElementById('sort_bin_grid');
+            if (grid) {
+                const cols = _activeSortConfig.bin_cols || 5;
+                const count = _activeSortConfig.bin_count || 10;
+                grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+                grid.innerHTML = '';
+                for (let i = 1; i <= count; i++) {
+                    const bin = document.createElement('div');
+                    bin.className = 'bin_box';
+                    bin.style.border = '1px solid #ddd';
+                    bin.style.padding = '5px';
+                    bin.style.textAlign = 'center';
+                    bin.style.borderRadius = '4px';
+                    bin.innerHTML = `<div class="small">#${i}</div><div id="sort_bin_val_${i}" style="font-weight:bold;">—</div>`;
+                    grid.appendChild(bin);
+                }
+            }
+        }
+    }
+
+    function handleSortLogic(data) {
+        if (!data || !data.target_bin) return;
+        const bin = data.target_bin;
+        const targetEl = document.getElementById('sort_target_bin');
+        if (targetEl) {
+            targetEl.textContent = bin;
+            targetEl.style.color = '#10b981';
+        }
+        
+        const infoEl = document.getElementById('sort_bin_info');
+        if (infoEl) {
+            infoEl.textContent = `Put ${data.part_name || 'part'} in Bin ${bin}`;
+            infoEl.style.color = '#059669';
+        }
+        
+        const approveBtn = document.getElementById('sort_approve_btn');
+        if (approveBtn) approveBtn.style.display = 'block';
+
+        if (_activeSortConfig && _activeSortConfig.bin_mode === 'visual') {
+            const valEl = document.getElementById(`sort_bin_val_${bin}`);
+            if (valEl) {
+                valEl.textContent = data.cabinet_assembly || 'YES';
+                valEl.parentElement.style.background = '#dcfce7';
+                valEl.parentElement.style.borderColor = '#10b981';
+            }
+        }
+        
+        if (_activeSortConfig && _activeSortConfig.bin_mode === 'table') {
+            const table = document.getElementById('sort_bin_table');
+            if (table) {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.borderBottom = '1px solid #eee';
+                row.style.padding = '4px 0';
+                row.innerHTML = `<span>Bin ${bin}</span><span>${data.cabinet_assembly || ''}</span>`;
+                table.prepend(row);
+                if (table.children.length > 10) table.lastChild.remove();
+            }
+        }
+    }
+
+    async function approveSortToBin() {
+        const targetEl = document.getElementById('sort_target_bin');
+        const bin = targetEl?.textContent;
+        if (!bin || bin === '—') return;
+        
+        toast(`Approved Bin ${bin}`);
+        const approveBtn = document.getElementById('sort_approve_btn');
+        if (approveBtn) approveBtn.style.display = 'none';
+        
+        if (targetEl) {
+            targetEl.textContent = '—';
+            targetEl.style.color = '';
+        }
+        const infoEl = document.getElementById('sort_bin_info');
+        if (infoEl) infoEl.textContent = 'Scan a part to see its bin';
+    }
+
+    async function submitScan(raw) {
+      const station_code = document.getElementById('station').value;
+      const operator_code = document.getElementById('operator').value;
+      if (!station_code) return;
+      
+      const payload = { 
+        station_code, 
+        raw_data: raw,
+        operator_id: operator_code
+      };
+      
+      const res = await fetch('/api/scans/web', { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body: JSON.stringify(payload) 
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) throw new Error(data.error || 'Login required');
+      if (!res.ok || data.error) throw new Error(data.error || res.statusText || `HTTP ${res.status}`);
+      
+      await refreshRecent();
+      if (_isKiosk) refreshKioskData();
+      
+      if (station_code.toLowerCase().includes('sort')) {
+        handleSortLogic(data);
+      }
+      
+      return data;
+    }
+
+    function handleSortLogic(data) {
+      const binDisplay = document.getElementById('sort_target_bin');
+      const binInfo = document.getElementById('sort_bin_info');
+      const approveBtn = document.getElementById('sort_approve_btn');
+      if (!binDisplay) return;
+      
+      if (data.target_bin) {
+        binDisplay.textContent = data.target_bin;
+        binInfo.textContent = data.bin_msg || `Part belongs in Bin ${data.target_bin}`;
+        approveBtn.style.display = 'block';
+      } else {
+        binDisplay.textContent = '—';
+        binInfo.textContent = 'No bin assigned for this part';
+        approveBtn.style.display = 'none';
+      }
+    }
+
+    async function approveSortToBin() {
+      toast('Part approved to bin');
+      document.getElementById('sort_approve_btn').style.display = 'none';
+    }
+
+    async function refreshRecent() {
+      const st = document.getElementById('station').value;
+      const res = await fetch(`/api/scans?limit=25&offset=0&station=${encodeURIComponent(st)}`);
+      const data = await res.json();
+      const scans = data.scans || [];
+      const el = document.getElementById('recent');
+      if (!scans.length) { el.innerHTML = '<em>No scans yet.</em>'; return; }
+      el.innerHTML = scans.map(s => {
+        const ts = (s.timestamp || '').toString();
+        const raw = (s.raw_data || '').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const job = (s.job_name || '').toString();
+        const cab = (s.cabinet_assembly || '').toString();
+        const part = (s.part_name || '').toString();
+        const op = (s.operator_id || '').toString();
+        const meta = [job && `Job: ${job}`, cab && `Cab: ${cab}`, part && `Part: ${part}`, op && `Op: ${op}`].filter(Boolean).join(' • ');
+        return `<div style="padding:8px; border-bottom:1px solid #eee;"><div class="mono">${raw}</div>${meta ? `<div class="small">${meta}</div>` : ''}<div class="small">${ts}</div></div>`;
+      }).join('');
+    }
+
+    let _lastScanObj = null;
+    async function refreshLastScan() {
+      const st = document.getElementById('station').value;
+      const el = document.getElementById('last_scan');
+      if (!el) return;
+      try {
+        const res = await fetch(`/api/scans?limit=1&offset=0&station=${encodeURIComponent(st)}`);
+        const data = await res.json().catch(() => ({}));
+        const scans = data.scans || [];
+        if (!scans.length) { _lastScanObj = null; el.innerHTML = '<em>No scans yet.</em>'; return; }
+        const s = scans[0];
+        _lastScanObj = s;
+        const ts = (s.timestamp || '').toString();
+        const raw = (s.raw_data || '').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const job = (s.job_name || '').toString();
+        const run = (s.run_name || '').toString();
+        const cab = (s.cabinet_assembly || '').toString();
+        const cabName = (s.cabinet_name || '').toString();
+        const part = (s.part_name || '').toString();
+        const op = (s.operator_id || '').toString();
+        el.innerHTML = `
+          <div class="mono" style="white-space:pre-wrap; word-break:break-word;">${raw}</div>
+          <div class="small" style="margin-top:6px;">
+            ${(job ? `Job: <b>${job}</b>` : '')}
+            ${(run ? ` • Run: <b>${run}</b>` : '')}
+            ${(cab ? ` • Cab: <b>${cab}</b>` : '')}
+            ${(cabName ? ` • Type: <b>${cabName}</b>` : '')}
+            ${(part ? ` • Part: <b>${part}</b>` : '')}
+            ${(op ? ` • Op: <b>${op}</b>` : '')}
+          </div>
+          <div class="small" style="margin-top:6px;">${ts}</div>
+        `;
+      } catch (e) {
+        el.innerHTML = `<span style="color:#b91c1c;">Error loading last scan: ${(e && (e.message || e.toString())) || 'Error'}</span>`;
+      }
+    }
+
+    async function refreshKioskMetrics() {
+      const st = document.getElementById('station').value;
+      const today = _today();
+      try {
+        const [dailyRes, timingRes] = await Promise.all([
+          fetch(`/api/reports/daily?date=${encodeURIComponent(today)}`).then(r => r.json()).catch(() => ({})),
+          fetch(`/api/reports/timing?date=${encodeURIComponent(today)}`).then(r => r.json()).catch(() => ({})),
+        ]);
+        const stDaily = (dailyRes && dailyRes.stations && dailyRes.stations[st]) ? dailyRes.stations[st] : null;
+        const scans = stDaily && (stDaily.scans ?? stDaily.scans_today) != null ? (stDaily.scans ?? stDaily.scans_today) : '—';
+        const jobs = stDaily && (stDaily.jobs ?? stDaily.jobs_today) != null ? (stDaily.jobs ?? stDaily.jobs_today) : '—';
+        const timing = (timingRes && timingRes.stations) ? (timingRes.stations[st] || {}) : {};
+        document.getElementById('m_scans').textContent = (scans === '—') ? '—' : String(scans);
+        document.getElementById('m_jobs').textContent = (jobs === '—') ? '—' : String(jobs);
+        document.getElementById('m_cycle').textContent = _fmtSeconds(timing.cycle_avg_seconds);
+        document.getElementById('m_gap').textContent = _fmtSeconds(timing.gap_avg_seconds);
+      } catch {}
+    }
+
+    function _qcKey() {
+      const st = document.getElementById('station').value || '';
+      const cab = (_lastScanObj && _lastScanObj.cabinet_assembly) ? String(_lastScanObj.cabinet_assembly) : '';
+      const day = _today();
+      return `innosaw_qc_v2_${st}_${day}_${cab || 'nocab'}`;
+    }
+    function renderQcChecklist() {
+      const list = document.getElementById('qc_checklist');
+      if (!list) return;
+      const items = [
+        { k:'doors', label:'All doors installed / aligned' },
+        { k:'drawers', label:'All drawers installed / slides OK' },
+        { k:'feet', label:'Feet / levelers installed' },
+        { k:'stickers', label:'Install sticker / labels applied' },
+        { k:'defects', label:'No visible defects (note if any)' },
+      ];
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(_qcKey()) || '{}') || {}; } catch { saved = {}; }
+      list.innerHTML = items.map(it => {
+        const checked = !!saved[it.k];
+        return `<label class="checklist_item"><input type="checkbox" data-qc="${it.k}" ${checked ? 'checked' : ''}><span>${it.label}</span></label>`;
+      }).join('');
+      const note = document.getElementById('qc_note');
+      if (note) note.value = (saved.note || '').toString();
+      const savedEl = document.getElementById('qc_saved');
+      if (savedEl) savedEl.textContent = saved.saved_at ? `Saved: ${saved.saved_at}` : '';
+    }
+    function saveQcChecklist() {
+      const out = {};
+      Array.from(document.querySelectorAll('input[type="checkbox"][data-qc]')).forEach(cb => {
+        out[cb.getAttribute('data-qc')] = !!cb.checked;
+      });
+      out.note = (document.getElementById('qc_note')?.value || '').toString().trim();
+      out.saved_at = new Date().toLocaleString();
+      try { localStorage.setItem(_qcKey(), JSON.stringify(out)); } catch {}
+      const savedEl = document.getElementById('qc_saved');
+      if (savedEl) savedEl.textContent = `Saved: ${out.saved_at}`;
+      toast('Saved QC checklist');
+    }
+
+    function pinStation() {
+      const st = document.getElementById('station').value;
+      if (!st) return;
+      try { localStorage.setItem('innosaw_mobile_station_pinned', st); } catch {}
+      try { window.location.search = `?station=${encodeURIComponent(st)}&kiosk=1`; } catch {}
+    }
+    function unpinStation() {
+      try { localStorage.removeItem('innosaw_mobile_station_pinned'); } catch {}
+      try { window.location.search = ''; } catch {}
+    }
+
+    function _stationTypeFor(st) {
+      const t = (st || '').toString().toLowerCase();
+      if (t.includes('qc')) return 'qc';
+      if (t.includes('assembly') || t.includes('build')) return 'assembly';
+      if (t.includes('cnc') || t.includes('h08') || t.includes('h10')) return 'cnc';
+      if (t.includes('sand')) return 'sand';
+      if (t.includes('edge')) return 'edge';
+      if (t.includes('dowel')) return 'dowel';
+      if (t.includes('sort')) return 'sort';
+      if (t.includes('wrap')) return 'wrap';
+      return 'other';
+    }
+    function _defaultLayoutObject() {
+      return {
+        version: 1,
+        defaults: { widgets: [
+          { type: 'last_scan', size: 'half' },
+          { type: 'today_metrics', size: 'half' },
+        ]},
+        station_types: {
+          qc: { widgets: [
+            { type: 'last_scan', size: 'half' },
+            { type: 'today_metrics', size: 'half' },
+            { type: 'qc_checklist', size: 'full' },
+          ] }
+        },
+        stations: {}
+      };
+    }
+    function _getLayoutForStation(st) {
+      const base = (_kioskLayout && typeof _kioskLayout === 'object') ? _kioskLayout : _defaultLayoutObject();
+      const stKey = (st || '').toString().trim();
+      const stLower = stKey.toLowerCase();
+      
+      const sel = document.getElementById('station');
+      const opt = sel?.options[sel.selectedIndex];
+      const profile = opt?.dataset.profile || '';
+
+      if (stKey && base.stations && base.stations[stKey] && Array.isArray(base.stations[stKey].widgets)) return base.stations[stKey];
+      
+      let stationWidget = null;
+      if (profile === 'assembly' || stLower.includes('assembly') || stLower.includes('build')) stationWidget = 'assembly_report';
+      else if (profile === 'cnc' || stLower.includes('cnc') || stLower.includes('h08') || stLower.includes('h10')) stationWidget = 'cnc_sheets';
+      else if (profile === 'sort' || stLower.includes('sort')) stationWidget = 'sort_bins';
+      else if (profile === 'qc' || stLower.includes('qc')) stationWidget = 'qc_checklist';
+      else if (profile === 'sand' || stLower.includes('sand')) stationWidget = 'sand_total';
+      else if (profile === 'wrap' || stLower.includes('wrap')) stationWidget = 'wrap_tracking';
+
+      if (stationWidget) {
+        const widgets = [
+          { type: 'usage_note', size: 'full' },
+          { type: stationWidget, size: 'full' }
+        ];
+        
+        // Add Material Approval widget for CNC stations
+        if (stationWidget === 'cnc_sheets') {
+            widgets.push({ type: 'cnc_material_approval', size: 'full' });
+        }
+        
+        widgets.push({ type: 'last_scan', size: 'half' });
+        widgets.push({ type: 'today_metrics', size: 'half' });
+        
+        return { widgets };
+      }
+
+      const ty = _stationTypeFor(stKey);
+      if (base.station_types && base.station_types[ty] && Array.isArray(base.station_types[ty].widgets)) return base.station_types[ty];
+      if (base.defaults && Array.isArray(base.defaults.widgets)) return base.defaults;
+      return _defaultLayoutObject().defaults;
+    }
+    function _clearKioskWidgets() {
+      const host = document.getElementById('kiosk_widgets');
+      const templates = document.getElementById('widget_templates');
+      if (!host || !templates) return;
+      Array.from(host.children).forEach(w => { if (!w.hasAttribute('data-cr-card')) templates.appendChild(w); });
+      host.innerHTML = '';
+      _customWidgets = [];
+    }
+    function _appendBuiltInWidget(host, widgetEl, size) {
+      if (!host || !widgetEl) return;
+      widgetEl.style.display = 'block';
+      widgetEl.style.gridColumn = (size === 'full') ? '1 / -1' : '';
+      host.appendChild(widgetEl);
+    }
+    function _renderCustomReportWidget(host, w, stationCode) {
+      const tpl = document.getElementById('tpl_custom_report');
+      if (!tpl || !tpl.content) return;
+      const node = tpl.content.cloneNode(true);
+      const titleEl = node.querySelector('[data-cr-title]');
+      const key = (w.report_key || '').toString().trim();
+      const title = (w.title || '').toString().trim() || 'Custom report';
+      if (titleEl) titleEl.textContent = title;
+      host.appendChild(node);
+      const cards = host.querySelectorAll('.metric_card[data-cr-card]');
+      const el = cards[cards.length - 1];
+      if (el) el.style.gridColumn = (w.size === 'full') ? '1 / -1' : '';
+      _customWidgets.push({ el, key, stationCode });
+      setTimeout(() => refreshCustomReportWidgets(), 50);
+    }
+    async function refreshCustomReportWidgets() {
+      if (!_customWidgets.length) return;
+      const today = _today();
+      for (const cw of _customWidgets) {
+        try {
+          const el = cw.el;
+          if (!el) continue;
+          const msg = el.querySelector('[data-cr-msg]');
+          const out = el.querySelector('[data-cr-out]');
+          if (!cw.key) { if (msg) msg.textContent = 'No report selected.'; continue; }
+          if (msg) msg.textContent = 'Running…';
+          if (out) out.innerHTML = '';
+          const qs = new URLSearchParams({ key: cw.key, date_from: today, date_to: today });
+          const res = await fetch(`/api/reports/custom/run?${qs.toString()}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+          if (msg) msg.textContent = `${data.report?.name || cw.key} — ${data.row_count || 0} rows`;
+          const cols = data.columns || [];
+          const rows = (data.rows || []).slice(0, 8);
+          const esc = (x) => (x === null || x === undefined) ? '' : String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          if (!cols.length) { if (out) out.innerHTML = '<div class="small"><em>No columns.</em></div>'; continue; }
+          const thead = cols.map(c => `<th>${esc(c)}</th>`).join('');
+          const tbody = rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('');
+          if (out) out.innerHTML = `<div style="overflow:auto; max-height:260px;"><table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div>`;
+        } catch (e) {
+          try {
+            const msg = cw.el?.querySelector?.('[data-cr-msg]');
+            if (msg) msg.textContent = `Error: ${(e && (e.message || e.toString())) || 'Failed'}`;
+          } catch {}
+        }
+      }
+    }
+    function renderKioskFromLayout() {
+      const sel = document.getElementById('station');
+      const opt = sel?.options[sel.selectedIndex];
+      const st = sel?.value || '';
+      const stLower = st.toLowerCase();
+      const profile = opt?.dataset.profile || '';
+      const cfg = _getLayoutForStation(st);
+      const host = document.getElementById('kiosk_widgets');
+      if (!host) return;
+      _clearKioskWidgets();
+      const widgets = (cfg && cfg.widgets && Array.isArray(cfg.widgets)) ? cfg.widgets : [];
+      for (const w of widgets) {
+        const type = (w.type || '').toString();
+        const size = (w.size || 'half').toString();
+        if (type === 'last_scan') _appendBuiltInWidget(host, document.getElementById('widget_last_scan'), size);
+        else if (type === 'today_metrics') _appendBuiltInWidget(host, document.getElementById('widget_today_metrics'), size);
+        else if (type === 'qc_checklist') _appendBuiltInWidget(host, document.getElementById('widget_qc_checklist'), size);
+        else if (type === 'assembly_report') _appendBuiltInWidget(host, document.getElementById('widget_assembly_report'), size);
+        else if (type === 'cnc_sheets') _appendBuiltInWidget(host, document.getElementById('widget_cnc_sheets'), size);
+        else if (type === 'cnc_material_approval') _appendBuiltInWidget(host, document.getElementById('widget_cnc_material_approval'), size);
+        else if (type === 'sort_bins') {
+            _activeSortConfig = w;
+            _appendBuiltInWidget(host, document.getElementById('widget_sort_bins'), size);
+            applySortConfig();
+        }
+        else if (type === 'sand_total') _appendBuiltInWidget(host, document.getElementById('widget_sand_total'), size);
+        else if (type === 'wrap_tracking') _appendBuiltInWidget(host, document.getElementById('widget_wrap_tracking'), size);
+        else if (type === 'usage_note') {
+          const noteEl = document.getElementById('widget_usage_note');
+          const contentEl = document.getElementById('usage_note_content');
+          if (contentEl) {
+            let note = "Scan a part to track progress.";
+            if (profile === 'assembly' || stLower.includes('assembly') || stLower.includes('build')) {
+              note = "Scan any part of cabinet to start timer. Scan any part of cabinet to stop timer. Separate timers for drawers and case.";
+            } else if (profile === 'cnc' || stLower.includes('cnc')) {
+              note = "Scan any part of sheet to start timer. Scan any part of sheet when done to stop timer and count 1 item from inventory (unless remnant QR scanned). Prompted for totals at end of day.";
+            } else if (profile === 'sand' || stLower.includes('sand')) {
+              note = "Scan part to start timer. Scan part to end timer. View sqft and part totals below.";
+            }
+            contentEl.textContent = note;
+          }
+          _appendBuiltInWidget(host, noteEl, size);
+        }
+        else if (type === 'custom_report') _renderCustomReportWidget(host, w, st);
+      }
+    }
+    async function loadKioskLayout() {
+      try {
+        const res = await fetch('/api/admin/kiosk_layout');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+        _kioskLayout = (data.layout && typeof data.layout === 'object') ? data.layout : null;
+      } catch { _kioskLayout = null; }
+    }
+    async function loadCustomReportDefs() {
+      try {
+        const res = await fetch('/api/reports/custom/defs');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+        _customReportDefs = Array.isArray(data.reports) ? data.reports.filter(r => r && r.active !== false) : [];
+      } catch { _customReportDefs = []; }
+    }
+    function openLayoutEditor() {
+      const w = document.getElementById('layout_wrap');
+      if (w) { w.style.display = 'flex'; layoutHydrateUi(); }
+    }
+    function closeLayoutEditor() {
+      const w = document.getElementById('layout_wrap');
+      if (w) w.style.display = 'none';
+    }
+    function _ensureLayoutObj() {
+      if (!_kioskLayout || typeof _kioskLayout !== 'object') _kioskLayout = _defaultLayoutObject();
+      if (!_kioskLayout.defaults) _kioskLayout.defaults = { widgets: _defaultLayoutObject().defaults.widgets.slice(0) };
+      if (!_kioskLayout.stations) _kioskLayout.stations = {};
+      if (!_kioskLayout.station_types) _kioskLayout.station_types = {};
+    }
+    function layoutHydrateUi() {
+      _ensureLayoutObj();
+      const targetSel = document.getElementById('layout_target');
+      const repSel = document.getElementById('layout_reports');
+      const msg = document.getElementById('layout_msg');
+      if (msg) msg.textContent = '';
+      if (!targetSel || !repSel) return;
+      const st = document.getElementById('station')?.value || '';
+      const codes = Array.from(document.getElementById('station')?.options || []).map(o => o.value).filter(Boolean);
+      targetSel.innerHTML = '';
+      [
+        { v: 'defaults', t: 'Default (all stations)' },
+        { v: 'type:qc', t: 'Station type: QC' },
+        { v: 'type:assembly', t: 'Station type: Assembly' },
+        { v: 'type:cnc', t: 'Station type: CNC' },
+        { v: 'type:sand', t: 'Station type: Sanding' },
+        { v: 'type:edge', t: 'Station type: Edge' },
+        { v: 'type:dowel', t: 'Station type: Dowel' },
+        { v: 'type:sort', t: 'Station type: Sorting' },
+        { v: 'type:wrap', t: 'Station type: Wrapping' },
+        { v: 'type:other', t: 'Station type: Other' },
+      ].forEach(o => { const el = document.createElement('option'); el.value=o.v; el.textContent=o.t; targetSel.appendChild(el); });
+      codes.forEach(c => { const el = document.createElement('option'); el.value=`station:${c}`; el.textContent=`Station: ${c}`; targetSel.appendChild(el); });
+      let pick = 'defaults';
+      if (st && _kioskLayout.stations && _kioskLayout.stations[st]) pick = `station:${st}`;
+      else pick = `type:${_stationTypeFor(st)}`;
+      targetSel.value = pick;
+      repSel.innerHTML = '<option value="">(select report)</option>' + _customReportDefs.map(r => `<option value="${r.key}">${r.built_in ? `${r.name} (built-in)` : r.name}</option>`).join('');
+      targetSel.addEventListener('change', () => layoutRenderRows());
+
+      // Global Bin Config
+      const binCfg = _kioskLayout.bin_config || { count: 40, cols: 10, rows: 4, mode: 'standard' };
+      document.getElementById('layout_bin_count').value = binCfg.count || 40;
+      document.getElementById('layout_bin_cols').value = binCfg.cols || 10;
+      document.getElementById('layout_bin_rows').value = binCfg.rows || 4;
+      document.getElementById('layout_bin_mode').value = binCfg.mode || 'standard';
+      document.getElementById('layout_bin_num_size').value = binCfg.num_size || 14;
+      document.getElementById('layout_bin_content_size').value = binCfg.content_size || 12;
+      document.getElementById('layout_bin_status_size').value = binCfg.status_size || 11;
+      document.getElementById('layout_bin_color_ready').value = binCfg.color_ready || '#059669';
+      document.getElementById('layout_bin_color_partial').value = binCfg.color_partial || '#2563eb';
+      document.getElementById('layout_bin_color_mixed').value = binCfg.color_mixed || '#d97706';
+      document.getElementById('layout_bin_color_empty').value = binCfg.color_empty || '#1a1a2e';
+
+      layoutRenderRows();
+    }
+    function _layoutGetTargetObj() {
+      _ensureLayoutObj();
+      const val = document.getElementById('layout_target')?.value || 'defaults';
+      if (val === 'defaults') return _kioskLayout.defaults;
+      if (val.startsWith('type:')) {
+        const ty = val.split(':')[1] || 'other';
+        if (!_kioskLayout.station_types[ty]) _kioskLayout.station_types[ty] = { widgets: [] };
+        return _kioskLayout.station_types[ty];
+      }
+      if (val.startsWith('station:')) {
+        const code = val.split(':')[1] || '';
+        if (!_kioskLayout.stations[code]) _kioskLayout.stations[code] = { widgets: [] };
+        return _kioskLayout.stations[code];
+      }
+      return _kioskLayout.defaults;
+    }
+    function _wrapField(lbl, node) {
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+      const l = document.createElement('div');
+      l.className = 'small';
+      l.textContent = lbl;
+      wrap.appendChild(l);
+      wrap.appendChild(node);
+      return wrap;
+    }
+    function layoutRenderRows() {
+      const rowsWrap = document.getElementById('layout_rows');
+      if (!rowsWrap) return;
+      const obj = _layoutGetTargetObj();
+      if (!Array.isArray(obj.widgets)) obj.widgets = [];
+      if (!obj.widgets.length) obj.widgets = _defaultLayoutObject().defaults.widgets.slice(0);
+      rowsWrap.innerHTML = '';
+      obj.widgets.forEach((w, idx) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.style.border = '1px solid #e5e7eb';
+        row.style.borderRadius = '10px';
+        row.style.padding = '10px';
+        row.style.marginBottom = '10px';
+        row.style.alignItems = 'end';
+        const type = document.createElement('select');
+        type.innerHTML = [
+          ['last_scan','Last scan'],
+          ['today_metrics','Today metrics'],
+          ['usage_note','Station Tracking Note'],
+          ['qc_checklist','QC checklist'],
+          ['assembly_report','Assembly Report'],
+          ['cnc_sheets','CNC Sheets'],
+          ['cnc_material_approval','CNC Material Approval'],
+          ['sort_bins','Sort/Bins'],
+          ['sand_total','Sanding Progress'],
+          ['wrap_tracking','Wrap Tracking'],
+          ['custom_report','Custom report summary'],
+        ].map(([v,t]) => `<option value="${v}">${t}</option>`).join('');
+        type.value = (w.type || 'last_scan');
+        const size = document.createElement('select');
+        size.innerHTML = `<option value="half">Half</option><option value="full">Full</option>`;
+        size.value = (w.size || 'half');
+        const title = document.createElement('input');
+        title.placeholder = 'Title (optional)';
+        title.value = (w.title || '');
+        title.style.minWidth = '220px';
+        title.style.flex = '1';
+        const extra = document.createElement('div');
+        extra.style.minWidth = '260px';
+        extra.style.flex = '2';
+        function renderExtra() {
+          extra.innerHTML = '';
+          if (type.value === 'custom_report') {
+            const sel = document.createElement('select');
+            sel.style.minWidth = '260px';
+            sel.innerHTML = `<option value="">(select report)</option>` + _customReportDefs.map(r => `<option value="${r.key}">${r.built_in ? `${r.name} (built-in)` : r.name}</option>`).join('');
+            sel.value = (w.report_key || '');
+            sel.addEventListener('change', () => { w.report_key = sel.value; });
+            extra.appendChild(sel);
+          } else if (type.value === 'sort_bins') {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.style.gap = '8px';
+            
+            const count = document.createElement('input');
+            count.type = 'number'; count.placeholder = 'Bins'; count.title = 'Number of bins';
+            count.value = w.bin_count || 1;
+            count.style.width = '60px';
+            count.addEventListener('input', () => { w.bin_count = parseInt(count.value) || 1; });
+            
+            const cols = document.createElement('input');
+            cols.type = 'number'; cols.placeholder = 'Cols'; cols.title = 'Columns for visual grid';
+            cols.value = w.bin_cols || 1;
+            cols.style.width = '60px';
+            cols.addEventListener('input', () => { w.bin_cols = parseInt(cols.value) || 1; });
+            
+            const mode = document.createElement('select');
+            mode.innerHTML = `
+              <option value="simple">Simple (Large Bin #)</option>
+              <option value="visual">Visual (Grid)</option>
+              <option value="table">Table (Parts List)</option>
+            `;
+            mode.value = w.bin_mode || 'simple';
+            mode.addEventListener('change', () => { w.bin_mode = mode.value; });
+            
+            row.appendChild(_wrapField('Bins', count));
+            row.appendChild(_wrapField('Cols', cols));
+            row.appendChild(_wrapField('Mode', mode));
+            extra.appendChild(row);
+          } else { extra.innerHTML = `<div class="small">—</div>`; }
+        }
+        const actions = document.createElement('div');
+        actions.className = 'row';
+        actions.style.gap = '8px';
+        const up = document.createElement('button');
+        up.className = 'btn btn-secondary'; up.type='button'; up.textContent='Up';
+        up.onclick = () => { if (idx<=0) return; const tmp=obj.widgets[idx-1]; obj.widgets[idx-1]=obj.widgets[idx]; obj.widgets[idx]=tmp; layoutRenderRows(); };
+        const down = document.createElement('button');
+        down.className = 'btn btn-secondary'; down.type='button'; down.textContent='Down';
+        down.onclick = () => { if (idx>=obj.widgets.length-1) return; const tmp=obj.widgets[idx+1]; obj.widgets[idx+1]=obj.widgets[idx]; obj.widgets[idx]=tmp; layoutRenderRows(); };
+        const del = document.createElement('button');
+        del.className = 'btn btn-secondary'; del.type='button'; del.textContent='Remove';
+        del.onclick = () => { obj.widgets.splice(idx,1); layoutRenderRows(); };
+        actions.appendChild(up); actions.appendChild(down); actions.appendChild(del);
+        type.addEventListener('change', () => { w.type = type.value; renderExtra(); });
+        size.addEventListener('change', () => { w.size = size.value; });
+        title.addEventListener('input', () => { w.title = title.value; });
+        row.appendChild(_wrapField('Type', type));
+        row.appendChild(_wrapField('Size', size));
+        row.appendChild(_wrapField('Title', title));
+        row.appendChild(_wrapField('Extra', extra));
+        row.appendChild(actions);
+        rowsWrap.appendChild(row);
+        renderExtra();
+      });
+    }
+    function layoutAddRow() {
+      const obj = _layoutGetTargetObj();
+      if (!Array.isArray(obj.widgets)) obj.widgets = [];
+      obj.widgets.push({ type: 'last_scan', size: 'half' });
+      layoutRenderRows();
+    }
+    function layoutPreview() {
+      renderKioskFromLayout();
+      refreshLastScan();
+      refreshKioskMetrics();
+      renderQcChecklist();
+      refreshCustomReportWidgets();
+      const msg = document.getElementById('layout_msg');
+      if (msg) msg.textContent = 'Preview applied (not saved yet).';
+    }
+    async function layoutSave() {
+      _ensureLayoutObj();
+      
+      // Update global bin config
+      _kioskLayout.bin_config = {
+        count: parseInt(document.getElementById('layout_bin_count').value) || 40,
+        cols: parseInt(document.getElementById('layout_bin_cols').value) || 10,
+        rows: parseInt(document.getElementById('layout_bin_rows').value) || 4,
+        mode: document.getElementById('layout_bin_mode').value || 'standard',
+        num_size: parseInt(document.getElementById('layout_bin_num_size').value) || 14,
+        content_size: parseInt(document.getElementById('layout_bin_content_size').value) || 12,
+        status_size: parseInt(document.getElementById('layout_bin_status_size').value) || 11,
+        color_ready: document.getElementById('layout_bin_color_ready').value,
+        color_partial: document.getElementById('layout_bin_color_partial').value,
+        color_mixed: document.getElementById('layout_bin_color_mixed').value,
+        color_empty: document.getElementById('layout_bin_color_empty').value
+      };
+
+      const msg = document.getElementById('layout_msg');
+      if (msg) msg.textContent = 'Saving…';
+      try {
+        const res = await fetch('/api/admin/kiosk_layout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ layout: _kioskLayout }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+        _kioskLayout = data.layout || _kioskLayout;
+        if (msg) msg.textContent = 'Saved.';
+        toast('Saved kiosk layout');
+        renderKioskFromLayout();
+      } catch (e) { if (msg) msg.textContent = `Save failed: ${e.message || 'Error'}`; }
+    }
+
+    async function startCamera() {
+      await stopCamera();
+      if (!window.isSecureContext) { alert('Camera requires HTTPS.'); return; }
+      if (!navigator.mediaDevices?.getUserMedia) { alert('Camera not available.'); return; }
+      if (typeof Html5Qrcode === 'undefined') { alert('Scanner library not loaded. Please refresh.'); return; }
+      document.querySelector('.mobile_sidebar')?.classList.add('camera_active');
+      const stopBtn = document.getElementById('camera_stop_btn');
+      if (stopBtn) stopBtn.style.display = 'block';
+      try {
+        const readerEl = document.getElementById('reader');
+        if (readerEl) readerEl.style.display = 'block';
+        const videoEl = document.getElementById('video');
+        if (videoEl) videoEl.style.display = 'none';
+        detector = new Html5Qrcode('reader');
+        setStatus('Starting camera...');
+        await detector.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: false,
+            formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E ]
+          }, async (decodedText) => {
+            const val = (decodedText || '').trim();
+            if (!val) return;
+            if (!canAccept(val) || isSubmitting) return;
+            isSubmitting = true;
+            markAccepted(val);
+            flash('rgba(16,185,129,0.25)');
+            setStatus('Submitting…');
+            try { await submitScan(val); beep(true); toast('✓ Sent'); setStatus('Camera running'); await refreshRecent();
+            } catch (e) {
+              const msg = e.message || 'Error';
+              flash('rgba(239,68,68,0.20)'); beep(false); toast(`Error: ${msg}`); setStatus('Error');
+              if (msg.toLowerCase().includes('login')) { try { stopCamera(); } catch {} }
+            } finally { isSubmitting = false; }
+          }, () => {}
+        );
+        setStatus('Camera running');
+      } catch (e) { alert(`Failed to start camera: ${e.message || e}`); setStatus('Error'); detector = null; }
+    }
+
+    async function stopCamera() {
+      document.querySelector('.mobile_sidebar')?.classList.remove('camera_active');
+      const stopBtn = document.getElementById('camera_stop_btn');
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (timer) { clearInterval(timer); timer = null; }
+      if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch {} stream = null; }
+      if (detector) { try { if (detector.isScanning) await detector.stop(); await detector.clear(); } catch (e) { console.error('Error stopping scanner:', e); } detector = null; }
+      const video = document.getElementById('video');
+      if (video) { video.srcObject = null; video.style.display = 'block'; }
+      setStatus('Idle');
+    }
+
+    async function submitManual() {
+      const inp = document.getElementById('manual');
+      const v = (inp.value || '').trim();
+      if (!v) return;
+      if (!canAccept(v)) { toast('Duplicate / too fast'); return; }
+      markAccepted(v);
+      inp.value = '';
+      setStatus('Submitting…');
+      isSubmitting = true;
+      try { await submitScan(v); flash('rgba(16,185,129,0.28)'); beep(true); toast('✓ Sent'); await refreshRecent();
+      } catch (e) { flash('rgba(239,68,68,0.25)'); beep(false); toast('Error sending scan');
+      } finally { setStatus(timer ? 'Scanning' : 'Idle'); setTimeout(() => { isSubmitting = false; }, 350); }
+    }
+
+    document.getElementById('manual').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitManual(); });
+
+    // Enterprise link rewrites
+    function fixExternalLinks() {
+      const host = window.location.hostname || 'localhost';
+      const proto = (window.location.protocol === 'https:') ? 'https' : 'http';
+      const portStr = window.location.port || '';
+      const hostParts = host.split('.');
+      const sub = hostParts[0];
+      const baseDomain = (hostParts.length >= 3 && (sub === 'qr' || sub === 'bins')) ? hostParts.slice(1).join('.') : null;
+      const onPublicHttps = !!baseDomain && proto === 'https';
+      const behindProxyNoPorts = !portStr || portStr === '80' || portStr === '443';
+      document.querySelectorAll('.ext-link').forEach(a => {
+        const port = a.getAttribute('data-port');
+        const path = a.getAttribute('data-path') || '/';
+        if (port === '5000') {
+          if (onPublicHttps) { a.href = `https://bins.${baseDomain}${path}`; return; }
+          if (behindProxyNoPorts) { a.href = `${proto}://${host}/bins${path.startsWith('/') ? path : `/${path}`}`; return; }
+        }
+        if (port) a.href = `${proto}://${host}:${port}${path}`;
+      });
+    }
+
+    (async function init() {
+      fixExternalLinks();
+      await refreshAuthStatus();
+      await loadStations();
+      await loadOperators();
+      
+      const qs = _qs();
+      let st = (qs.get('station') || '').toString().trim();
+      if (!st) { try { st = (localStorage.getItem('innosaw_mobile_station_pinned') || '').toString().trim(); } catch {} }
+      const kioskParam = (qs.get('kiosk') || '').toString() === '1';
+      const sel = document.getElementById('station');
+      if (st && sel) sel.value = st;
+      
+      // Auto-kiosk if profile matches or station name matches common types
+      const stLower = st.toLowerCase();
+      const opt = sel?.options[sel.selectedIndex];
+      const profile = opt?.dataset.profile || '';
+      const shouldAutoKiosk = _autoKioskStations.some(type => profile === type || stLower.includes(type));
+
+      if (kioskParam || shouldAutoKiosk) {
+        toggleKioskMode(true);
+      }
+      
+      await onStationChange();
+      
+      await loadKioskLayout();
+      await loadCustomReportDefs();
+      
+      if (_isKiosk) { renderKioskFromLayout(); refreshKioskData(); } else { await refreshRecent(); }
+      
+      setInterval(async () => { if (_isKiosk) await refreshKioskData(); else await refreshRecent(); }, 8000);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bat Shape Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #0b1220;
+            --panel: #0f172a;
+            --accent: #7dd3fc;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --stroke: #1f2937;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 10% 20%, #111827 0, #0b1220 32%, #0a0f1a 100%);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+        .shell {
+            width: min(1200px, 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #0b1220 40%, #0b1220 60%, #111827 100%);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        }
+        header {
+            padding: 18px 20px 10px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: -0.02em;
+        }
+        header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 0;
+            border-top: 1px solid var(--stroke);
+        }
+        .panel {
+            background: rgba(15, 23, 42, 0.88);
+            border-right: 1px solid var(--stroke);
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .group h3 {
+            margin: 0 0 6px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+        }
+        label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 14px;
+            color: var(--text);
+            margin: 8px 0;
+        }
+        input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+        }
+        select, input[type="color"] {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--stroke);
+            background: #0b1220;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+        }
+        .viewer {
+            position: relative;
+            background: radial-gradient(circle at 50% 30%, rgba(125, 211, 252, 0.08), transparent 48%), #060a12;
+        }
+        #viewport {
+            width: 100%;
+            height: 640px;
+        }
+        .hud {
+            position: absolute;
+            left: 16px;
+            bottom: 16px;
+            background: rgba(11, 18, 32, 0.85);
+            border: 1px solid var(--stroke);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--muted);
+            backdrop-filter: blur(6px);
+        }
+        .toggles {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid var(--stroke);
+        }
+        .toggle input { margin: 0; }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(125, 211, 252, 0.12);
+            border: 1px solid rgba(125, 211, 252, 0.4);
+            color: var(--accent);
+            font-size: 13px;
+            width: fit-content;
+        }
+        .inline-value { color: var(--accent); font-variant-numeric: tabular-nums; }
+        @media (max-width: 980px) {
+            .layout { grid-template-columns: 1fr; }
+            #viewport { height: 520px; }
+            .panel { border-right: none; border-bottom: 1px solid var(--stroke); }
+        }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.161.0/examples/jsm/",
+            "three/examples/jsm/utils/BufferGeometryUtils.js": "https://unpkg.com/three@0.161.0/examples/jsm/utils/BufferGeometryUtils.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div class="shell">
+        <header>
+            <div>
+                <h1>Bat Shape Lab</h1>
+                <p>Tune length, taper, handle, and finish with live 3D feedback.</p>
+            </div>
+            <div class="pill">Drag to orbit · Scroll to zoom</div>
+        </header>
+        <div class="layout">
+            <aside class="panel">
+                <div class="group">
+                    <h3>Geometry</h3>
+                    <label>Length <span class="inline-value" id="lenVal"></span></label>
+                    <input id="length" type="range" min="25" max="35" step="0.25" value="34" />
+                    <label>Handle radius <span class="inline-value" id="handleVal"></span></label>
+                    <input id="handleRadius" type="range" min="0.8" max="1.25" step="0.01" value="1.0" />
+                    <label>Taper starts at <span class="inline-value" id="taperVal"></span></label>
+                    <input id="taperStart" type="range" min="6" max="25" step="0.25" value="18" />
+                    <label>Barrel radius <span class="inline-value" id="barrelVal"></span></label>
+                    <input id="barrelRadius" type="range" min="1.25" max="1.7" step="0.01" value="1.45" />
+                    <label>Knob radius <span class="inline-value" id="knobVal"></span></label>
+                    <input id="knobRadius" type="range" min="1.0" max="1.6" step="0.01" value="1.25" />
+                    <label>Knob depth <span class="inline-value" id="knobDepthVal"></span></label>
+                    <input id="knobDepth" type="range" min="0.5" max="2.5" step="0.05" value="1.2" />
+                </div>
+
+                <div class="group">
+                    <h3>Finish</h3>
+                    <label for="texture">Texture preset</label>
+                    <select id="texture">
+                        <option value="none">Solid color</option>
+                        <option value="maple" selected>Maple wood</option>
+                        <option value="paint">Matte paint</option>
+                        <option value="carbon">Carbon wrap</option>
+                        <option value="upload">Custom wrap</option>
+                    </select>
+                    <label for="textureUpload">Custom wrap image</label>
+                    <input id="textureUpload" type="file" accept="image/*" />
+                    <label for="color">Accent tint</label>
+                    <input id="color" type="color" value="#c59b6d" />
+                    <div class="toggles">
+                        <label class="toggle"><input id="grid" type="checkbox" checked /> Grid</label>
+                        <label class="toggle"><input id="wire" type="checkbox" /> Wireframe</label>
+                        <label class="toggle"><input id="spin" type="checkbox" /> Slow spin</label>
+                        <label class="toggle"><input id="lights" type="checkbox" checked /> Rim light</label>
+                    </div>
+                </div>
+
+                <div class="group">
+                    <h3>Notes</h3>
+                    <p style="margin:0; color:var(--muted); font-size:13px; line-height:1.5;">Use length and taper start to match league rules, then dial handle/knob comfort. Textures are lightweight for quick previews.</p>
+                </div>
+            </aside>
+
+            <section class="viewer">
+                <div id="viewport"></div>
+                <div class="hud" id="hud">–</div>
+            </section>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+        import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+        const ui = {
+            length: document.getElementById('length'),
+            handleRadius: document.getElementById('handleRadius'),
+            taperStart: document.getElementById('taperStart'),
+            barrelRadius: document.getElementById('barrelRadius'),
+            knobRadius: document.getElementById('knobRadius'),
+            knobDepth: document.getElementById('knobDepth'),
+            texture: document.getElementById('texture'),
+            textureUpload: document.getElementById('textureUpload'),
+            color: document.getElementById('color'),
+            grid: document.getElementById('grid'),
+            wire: document.getElementById('wire'),
+            spin: document.getElementById('spin'),
+            lights: document.getElementById('lights'),
+            hud: document.getElementById('hud'),
+            viewport: document.getElementById('viewport'),
+            readouts: {
+                len: document.getElementById('lenVal'),
+                handle: document.getElementById('handleVal'),
+                taper: document.getElementById('taperVal'),
+                barrel: document.getElementById('barrelVal'),
+                knob: document.getElementById('knobVal'),
+                knobDepth: document.getElementById('knobDepthVal')
+            }
+        };
+
+        const state = {
+            scene: null,
+            renderer: null,
+            camera: null,
+            controls: null,
+            batMesh: null,
+            batMaterial: null,
+            spinPhase: 0,
+            lights: [],
+            textures: new Map(),
+            clock: new THREE.Clock(),
+            uploadUrl: null
+        };
+
+        const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+        const mix = (a, b, t) => a * (1 - t) + b * t;
+        const easeInQuad = t => t * t;
+        const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+        const easeInOutQuad = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+        const texturePresets = {
+            none: null,
+            maple: {
+                map: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
+                normal: 'https://threejs.org/examples/textures/hardwood2_normal.jpg'
+            },
+            paint: {
+                map: 'https://threejs.org/examples/textures/uv_grid_opengl.jpg',
+                normal: null
+            },
+            carbon: {
+                map: 'https://threejs.org/examples/textures/carbon/Carbon_Weave_001_basecolor.jpg',
+                normal: 'https://threejs.org/examples/textures/carbon/Carbon_Weave_001_normal.jpg'
+            }
+        };
+
+        init();
+        buildBat();
+        animate();
+
+        function init() {
+            state.scene = new THREE.Scene();
+            state.scene.background = new THREE.Color(0x060a12);
+
+            const { clientWidth, clientHeight } = ui.viewport;
+            state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            state.renderer.setSize(clientWidth, clientHeight);
+            ui.viewport.appendChild(state.renderer.domElement);
+
+            state.camera = new THREE.PerspectiveCamera(55, clientWidth / clientHeight, 0.1, 200);
+            state.camera.position.set(8, 3.5, 8);
+
+            state.controls = new OrbitControls(state.camera, state.renderer.domElement);
+            state.controls.enableDamping = true;
+            state.controls.dampingFactor = 0.08;
+            state.controls.target.set(0, 0, 0);
+
+            addLights();
+            addGround();
+
+            window.addEventListener('resize', onResize);
+            Object.values(ui.readouts).forEach(el => el.textContent = '');
+            attachUI();
+        }
+
+        function addLights() {
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x0a0f1a, 0.55);
+            state.scene.add(hemi);
+            const key = new THREE.DirectionalLight(0xffffff, 0.8);
+            key.position.set(5, 8, 6);
+            const rim = new THREE.DirectionalLight(0x9bd5ff, 0.45);
+            rim.position.set(-6, 4, -5);
+            state.scene.add(key, rim);
+            state.lights = [hemi, key, rim];
+        }
+
+        function addGround() {
+            const geo = new THREE.PlaneGeometry(80, 80, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x0c1629, roughness: 0.8, metalness: 0.1 });
+            const ground = new THREE.Mesh(geo, mat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -1.2;
+            ground.receiveShadow = false;
+            state.scene.add(ground);
+
+            const grid = new THREE.GridHelper(40, 40, 0x2f3c55, 0x1b2539);
+            grid.material.transparent = true;
+            grid.material.opacity = 0.45;
+            grid.visible = ui.grid.checked;
+            grid.position.y = -1.199;
+            state.scene.add(grid);
+            state.grid = grid;
+        }
+
+        function attachUI() {
+            const sliders = ['length', 'handleRadius', 'taperStart', 'barrelRadius', 'knobRadius', 'knobDepth'];
+            sliders.forEach(id => {
+                ui[id].addEventListener('input', () => {
+                    updateLabels();
+                    buildBat();
+                });
+            });
+            ui.texture.addEventListener('change', () => updateMaterial());
+            ui.textureUpload.addEventListener('change', handleUploadTexture);
+            ui.color.addEventListener('input', () => updateMaterial());
+            ui.grid.addEventListener('change', () => { if (state.grid) state.grid.visible = ui.grid.checked; });
+            ui.wire.addEventListener('change', () => {
+                if (state.batMesh?.material) state.batMesh.material.wireframe = ui.wire.checked;
+            });
+            ui.spin.addEventListener('change', () => { state.spinPhase = 0; });
+            ui.lights.addEventListener('change', () => state.lights.forEach(l => l.visible = ui.lights.checked));
+            updateLabels();
+        }
+
+        function updateLabels() {
+            ui.readouts.len.textContent = `${Number(ui.length.value).toFixed(2)} in`;
+            ui.readouts.handle.textContent = `${Number(ui.handleRadius.value).toFixed(2)} in`;
+            ui.readouts.taper.textContent = `${Number(ui.taperStart.value).toFixed(2)} in`;
+            ui.readouts.barrel.textContent = `${Number(ui.barrelRadius.value).toFixed(2)} in`;
+            ui.readouts.knob.textContent = `${Number(ui.knobRadius.value).toFixed(2)} in`;
+            ui.readouts.knobDepth.textContent = `${Number(ui.knobDepth.value).toFixed(2)} in`;
+        }
+
+        function buildBat() {
+            const params = {
+                length: clamp(Number(ui.length.value), 25, 35),
+                handleRadius: clamp(Number(ui.handleRadius.value), 0.8, 1.25),
+                taperStart: clamp(Number(ui.taperStart.value), 6, 25),
+                barrelRadius: clamp(Number(ui.barrelRadius.value), 1.25, 1.8),
+                knobRadius: clamp(Number(ui.knobRadius.value), 0.9, 1.8),
+                knobDepth: clamp(Number(ui.knobDepth.value), 0.4, 3.0),
+                radialSegments: 64,
+                slices: 160
+            };
+
+            if (state.batMesh) {
+                state.scene.remove(state.batMesh);
+                state.batMesh.geometry.dispose();
+            }
+
+            const profile = buildProfile(params);
+            const lathe = new THREE.LatheGeometry(profile, params.radialSegments);
+            lathe.computeVertexNormals();
+
+            const rStart = profile[0].x;
+            const rEnd = profile[profile.length - 1].x;
+            const capStart = new THREE.CircleGeometry(rStart, params.radialSegments);
+            capStart.rotateX(Math.PI / 2);
+            capStart.translate(0, -params.length / 2, 0);
+            const capEnd = new THREE.CircleGeometry(rEnd, params.radialSegments);
+            capEnd.rotateX(-Math.PI / 2);
+            capEnd.translate(0, params.length / 2, 0);
+
+            const geometry = BufferGeometryUtils.mergeGeometries([lathe, capStart, capEnd], true);
+            geometry.computeVertexNormals();
+            geometry.computeBoundingSphere();
+
+            if (!state.batMaterial) {
+                state.batMaterial = new THREE.MeshStandardMaterial({ color: ui.color.value, roughness: 0.42, metalness: 0.18 });
+                updateMaterial();
+            }
+
+            state.batMesh = new THREE.Mesh(geometry, state.batMaterial);
+            state.batMesh.rotation.x = Math.PI / 2;
+            state.batMesh.castShadow = false;
+            state.scene.add(state.batMesh);
+
+            centerCamera(geometry.boundingSphere?.radius || 6);
+            setHud(params);
+        }
+
+        function buildProfile({ length, handleRadius, taperStart, barrelRadius, knobRadius, knobDepth, slices }) {
+            const pts = [];
+            const tipBlend = Math.max(0.6, Math.min(1.4, length * 0.03));
+            const taperEnd = Math.max(taperStart + 0.5, length - tipBlend);
+            for (let i = 0; i <= slices; i += 1) {
+                const t = i / slices;
+                const y = t * length;
+                let r = handleRadius;
+                if (y < knobDepth) {
+                    const k = y / knobDepth;
+                    r = mix(knobRadius, handleRadius, easeOutCubic(k));
+                } else if (y < taperStart) {
+                    r = handleRadius;
+                } else if (y < taperEnd) {
+                    const k = (y - taperStart) / (taperEnd - taperStart);
+                    r = mix(handleRadius, barrelRadius, easeInOutQuad(k));
+                } else {
+                    const k = (y - taperEnd) / (length - taperEnd);
+                    r = mix(barrelRadius, barrelRadius * 0.85, easeInQuad(k));
+                }
+                pts.push(new THREE.Vector2(r, y - length / 2));
+            }
+            return pts;
+        }
+
+        function handleUploadTexture() {
+            const file = ui.textureUpload.files?.[0];
+            if (!file) return;
+            if (state.uploadUrl) URL.revokeObjectURL(state.uploadUrl);
+            state.uploadUrl = URL.createObjectURL(file);
+            ui.texture.value = 'upload';
+            updateMaterial();
+        }
+
+        function updateMaterial() {
+            const preset = texturePresets[ui.texture.value] || null;
+            const loader = new THREE.TextureLoader();
+            const disposeMaps = () => {
+                ['map', 'normalMap'].forEach(key => {
+                    if (state.batMaterial[key]) {
+                        state.batMaterial[key].dispose();
+                        state.batMaterial[key] = null;
+                    }
+                });
+            };
+            disposeMaps();
+
+            if (ui.texture.value === 'upload' && state.uploadUrl) {
+                loader.load(state.uploadUrl, tex => {
+                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                    tex.anisotropy = state.renderer.capabilities.getMaxAnisotropy();
+                    tex.repeat.set(2.4, 0.4);
+                    state.batMaterial.map = tex;
+                    state.batMaterial.normalMap = null;
+                    state.batMaterial.color = new THREE.Color(ui.color.value);
+                    state.batMaterial.roughness = 0.45;
+                    state.batMaterial.metalness = 0.12;
+                    state.batMaterial.needsUpdate = true;
+                });
+                return;
+            }
+
+            if (!preset) {
+                state.batMaterial.color = new THREE.Color(ui.color.value);
+                state.batMaterial.roughness = 0.42;
+                state.batMaterial.metalness = 0.18;
+                state.batMaterial.needsUpdate = true;
+                return;
+            }
+
+            if (preset.map) {
+                loader.load(preset.map, tex => {
+                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                    tex.anisotropy = state.renderer.capabilities.getMaxAnisotropy();
+                    tex.repeat.set(1.8, 0.35);
+                    state.batMaterial.map = tex;
+                    state.batMaterial.color = new THREE.Color(ui.color.value);
+                    state.batMaterial.needsUpdate = true;
+                });
+            }
+            if (preset.normal) {
+                loader.load(preset.normal, tex => {
+                    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                    tex.anisotropy = state.renderer.capabilities.getMaxAnisotropy();
+                    tex.repeat.set(1.8, 0.35);
+                    state.batMaterial.normalMap = tex;
+                    state.batMaterial.needsUpdate = true;
+                });
+            }
+            state.batMaterial.roughness = ui.texture.value === 'paint' ? 0.6 : 0.35;
+            state.batMaterial.metalness = ui.texture.value === 'paint' ? 0.05 : 0.15;
+        }
+
+        function centerCamera(radius) {
+            const dist = radius * 2.3;
+            state.camera.position.set(dist, radius * 0.5, dist * 0.6);
+            state.controls.target.set(0, 0, 0);
+            state.controls.update();
+        }
+
+        function setHud(params) {
+            ui.hud.textContent = `Length ${params.length.toFixed(2)} in · Handle ${params.handleRadius.toFixed(2)} in · Barrel ${params.barrelRadius.toFixed(2)} in · Taper @ ${params.taperStart.toFixed(2)} in`;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = state.clock.getDelta();
+            if (state.controls) state.controls.update();
+            if (ui.spin.checked && state.batMesh) {
+                state.spinPhase += dt;
+                state.batMesh.rotation.z = Math.PI / 2 + state.spinPhase * 0.4;
+            }
+            if (state.renderer && state.scene && state.camera) {
+                state.renderer.render(state.scene, state.camera);
+            }
+        }
+
+        function onResize() {
+            const { clientWidth, clientHeight } = ui.viewport;
+            if (!clientWidth || !clientHeight) return;
+            state.camera.aspect = clientWidth / clientHeight;
+            state.camera.updateProjectionMatrix();
+            state.renderer.setSize(clientWidth, clientHeight);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Innosaw - Door Size Calculator</title>
+    <link rel="stylesheet" href="/static/common.css?v=20251222">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary: #0d2137;
+            --primary-light: #1a3a5c;
+            --accent: #2563eb;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .calc-container {
+            max-width: 1300px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header-section h1 {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            background: #f1f5f9;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: #eff6ff;
+        }
+
+        .drop-zone i {
+            font-size: 32px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .input-group:last-of-type { border-bottom: none; }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .inp {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .inp:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .unit-toggle-small {
+            display: flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 8px;
+            gap: 2px;
+            width: 90px;
+        }
+
+        .unit-btn-small {
+            flex: 1;
+            border: none;
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            color: #64748b;
+        }
+
+        .unit-btn-small.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 15px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            margin-top: 10px;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:hover { background: var(--primary-light); }
+
+        .results-section {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .table-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .export-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .btn-sm:hover { background: #f1f5f9; }
+
+        .table-wrap {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #f8fafc;
+            text-align: left;
+            padding: 12px 16px;
+            font-weight: 800;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .badge-original { background: #f1f5f9; color: #475569; }
+        .badge-adjusted { background: #dcfce7; color: #166534; }
+        .badge-oversized { background: #fef9c3; color: #854d0e; }
+
+        /* Image Modal */
+        .img-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            cursor: zoom-out;
+        }
+        .img-modal img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .public-nav {
+            background: white;
+            padding: 15px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .public-nav a {
+            text-decoration: none;
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 14px;
+        }
+        .public-nav .logo {
+            font-size: 20px;
+            letter-spacing: -0.5px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-layout { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="public-nav">
+        <div class="logo"><strong>INNOSAW</strong> Door Calc</div>
+        <a href="/shop">← Back to Main System</a>
+    </div>
+
+    <div class="calc-container">
+        <div class="grid-layout">
+            <!-- Sidebar / Inputs -->
+            <div class="card">
+                <div id="drop_zone" class="drop-zone" onclick="document.getElementById('file_input').click()">
+                    <i>📄</i>
+                    <p id="file_status" style="font-weight: 700;">Drag CSV here</p>
+                    <span style="font-size: 11px; color: #94a3b8;">or click to browse</span>
+                    <input type="file" id="file_input" hidden accept=".csv">
+                </div>
+
+                <div class="input-group">
+                    <label>Main Document Units (Output)</label>
+                    <div class="unit-toggle-small" style="width: 100%;">
+                        <button class="unit-btn-small active" id="unit_main_in" onclick="setUnits('main', 'in')">Inches</button>
+                        <button class="unit-btn-small" id="unit_main_mm" onclick="setUnits('main', 'mm')">MM</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Edgeband Thickness</label>
+                    <div class="input-row" style="margin-bottom: 8px;">
+                        <input type="number" id="edgeband_val" class="inp" value="0.125" step="0.001" oninput="calculate()">
+                        <div class="unit-toggle-small">
+                            <button class="unit-btn-small active" id="unit_eb_in" onclick="setUnits('eb', 'in')">in</button>
+                            <button class="unit-btn-small" id="unit_eb_mm" onclick="setUnits('eb', 'mm')">mm</button>
+                        </div>
+                    </div>
+                    <small style="color: #94a3b8; font-size: 11px;">Subtracted (2x) from Original Dimensions</small>
+                </div>
+
+                <div class="input-group">
+                    <label>Oversize Amount</label>
+                    <div class="input-row" style="margin-bottom: 8px;">
+                        <input type="number" id="oversize_val" class="inp" value="0" step="0.001" oninput="calculate()">
+                        <div class="unit-toggle-small">
+                            <button class="unit-btn-small active" id="unit_os_in" onclick="setUnits('os', 'in')">in</button>
+                            <button class="unit-btn-small" id="unit_os_mm" onclick="setUnits('os', 'mm')">mm</button>
+                        </div>
+                    </div>
+                    <small style="color: #94a3b8; font-size: 11px;">Added to Original Dimensions</small>
+                </div>
+
+                <div class="input-group">
+                    <label>Material Size (for estimation)</label>
+                    <div class="input-row" style="margin-bottom: 8px;">
+                        <input type="number" id="sheet_w" class="inp" value="48" step="0.1" oninput="calculate()">
+                        <span style="font-weight: 700; color: #94a3b8;">x</span>
+                        <input type="number" id="sheet_l" class="inp" value="96" step="0.1" oninput="calculate()">
+                        <div class="unit-toggle-small">
+                            <button class="unit-btn-small active" id="unit_sheet_in" onclick="setUnits('sheet', 'in')">in</button>
+                            <button class="unit-btn-small" id="unit_sheet_mm" onclick="setUnits('sheet', 'mm')">mm</button>
+                        </div>
+                    </div>
+                    <small style="color: #94a3b8; font-size: 11px;">Standard sheet size (e.g. 48x96 or 1220x2440)</small>
+                </div>
+
+                <div class="input-group">
+                    <label>Nesting Yield (%)</label>
+                    <div class="input-row">
+                        <input type="number" id="yield_val" class="inp" value="80" min="1" max="100" oninput="calculate()">
+                        <span style="font-weight: 700; color: #94a3b8; width: 30px;">%</span>
+                    </div>
+                    <small style="color: #94a3b8; font-size: 11px;">Estimated material utilization (80% typical)</small>
+                </div>
+
+                <button class="btn-primary" onclick="proceed()">Regenerate Lists</button>
+                
+                <div id="stats" style="margin-top: 20px; font-size: 12px; color: #64748b; display: none; background: #f8fafc; padding: 12px; border-radius: 10px;">
+                    <strong>File:</strong> <span id="stat_filename">None</span><br>
+                    <strong>Rows:</strong> <span id="stat_rows">0</span>
+                </div>
+            </div>
+
+        <div class="results-section" id="results_wrap">
+            <div class="card" id="help_card">
+                <h3>How to export from Mozaik</h3>
+                <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">To get your door list into this calculator, follow these steps in Mozaik:</p>
+                <div style="display: flex; gap: 20px; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <ol style="font-size: 13px; line-height: 1.6; padding-left: 20px; color: #475569;">
+                            <li>Open your job in Mozaik.</li>
+                            <li>Go to the <strong>Products</strong> or <strong>Items</strong> list.</li>
+                            <li>Select <strong>Export Door List</strong> (or Cutlist).</li>
+                            <li>Ensure the CSV format matches: Qty, Width, Height, Part, Cabinet...</li>
+                            <li>Drag that CSV file into the box on the left.</li>
+                        </ol>
+                    </div>
+                    <div style="width: 200px; text-align: center;">
+                        <img src="/static/img/help/door_export_guide.jpg" 
+                             style="width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;" 
+                             onclick="openImgModal(this.src)" 
+                             alt="Export Guide"
+                             onerror="this.style.display='none'; document.getElementById('img_fallback').style.display='block';">
+                        <div id="img_fallback" style="display:none; font-size: 10px; color: #94a3b8; border: 1px dashed #cbd5e1; padding: 20px; border-radius: 8px;">
+                            (Help Image: 610878340...jpg)
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; margin-top: 6px; color: #64748b;">Click to Expand</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card empty-state" id="empty_msg" style="display: none;">
+                <p style="font-weight: 700; color: #64748b;">No data loaded.</p>
+                <p style="font-size: 13px;">Please upload a door size CSV to begin calculations.</p>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <div id="img_modal" class="img-modal" onclick="if(event.target===this && !window.getSelection().toString().length) this.style.display='none'">
+        <img id="modal_img" src="">
+        <div style="position: absolute; bottom: 20px; color: white; font-weight: 800; font-size: 18px;">Export Door List First</div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let unitsMain = 'in';
+        let unitsEb = 'in';
+        let unitsOs = 'in';
+        let unitsSheet = 'in';
+        let currentFile = null;
+
+        const dropZone = document.getElementById('drop_zone');
+        const fileInput = document.getElementById('file_input');
+
+        // Drag & Drop Handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('drag-over'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+        function setUnits(type, u) {
+            if (type === 'main') {
+                unitsMain = u;
+                document.getElementById('unit_main_in').classList.toggle('active', u === 'in');
+                document.getElementById('unit_main_mm').classList.toggle('active', u === 'mm');
+            } else if (type === 'eb') {
+                const oldVal = parseFloat(document.getElementById('edgeband_val').value) || 0;
+                if (unitsEb !== u) {
+                    document.getElementById('edgeband_val').value = (u === 'mm' ? oldVal * 25.4 : oldVal / 25.4).toFixed(3);
+                }
+                unitsEb = u;
+                document.getElementById('unit_eb_in').classList.toggle('active', u === 'in');
+                document.getElementById('unit_eb_mm').classList.toggle('active', u === 'mm');
+            } else if (type === 'os') {
+                const oldVal = parseFloat(document.getElementById('oversize_val').value) || 0;
+                if (unitsOs !== u) {
+                    document.getElementById('oversize_val').value = (u === 'mm' ? oldVal * 25.4 : oldVal / 25.4).toFixed(3);
+                }
+                unitsOs = u;
+                document.getElementById('unit_os_in').classList.toggle('active', u === 'in');
+                document.getElementById('unit_os_mm').classList.toggle('active', u === 'mm');
+            } else if (type === 'sheet') {
+                const oldW = parseFloat(document.getElementById('sheet_w').value) || 0;
+                const oldL = parseFloat(document.getElementById('sheet_l').value) || 0;
+                if (unitsSheet !== u) {
+                    document.getElementById('sheet_w').value = (u === 'mm' ? oldW * 25.4 : oldW / 25.4).toFixed(1);
+                    document.getElementById('sheet_l').value = (u === 'mm' ? oldL * 25.4 : oldL / 25.4).toFixed(1);
+                }
+                unitsSheet = u;
+                document.getElementById('unit_sheet_in').classList.toggle('active', u === 'in');
+                document.getElementById('unit_sheet_mm').classList.toggle('active', u === 'mm');
+            }
+            
+            if (rawData.length) calculate();
+        }
+
+        function handleFiles(files) {
+            if (!files.length) return;
+            const file = files[0];
+            currentFile = file;
+            document.getElementById('file_status').innerText = file.name;
+            document.getElementById('stat_filename').innerText = file.name;
+            document.getElementById('stats').style.display = 'block';
+
+            Papa.parse(file, {
+                complete: function(results) {
+                    rawData = results.data.filter(row => row.length >= 3 && row[0] !== "");
+                    document.getElementById('stat_rows').innerText = rawData.length;
+                    calculate();
+                },
+                header: false
+            });
+        }
+
+        function toIn(val, fromUnit) {
+            return fromUnit === 'mm' ? val / 25.4 : val;
+        }
+
+        function fromIn(val, toUnit) {
+            return toUnit === 'mm' ? val * 25.4 : val;
+        }
+
+        function openImgModal(src) {
+            document.getElementById('modal_img').src = src;
+            document.getElementById('img_modal').style.display = 'flex';
+        }
+
+        function calculate() {
+            if (!rawData.length) return;
+            
+            // Get values and normalize to Inches for math
+            const ebRaw = parseFloat(document.getElementById('edgeband_val').value) || 0;
+            const osRaw = parseFloat(document.getElementById('oversize_val').value) || 0;
+            const sheetWRaw = parseFloat(document.getElementById('sheet_w').value) || 48;
+            const sheetLRaw = parseFloat(document.getElementById('sheet_l').value) || 96;
+            const yieldPct = parseFloat(document.getElementById('yield_val').value) || 80;
+            
+            const ebIn = toIn(ebRaw, unitsEb);
+            const osIn = toIn(osRaw, unitsOs);
+            const sheetWIn = toIn(sheetWRaw, unitsSheet);
+            const sheetLIn = toIn(sheetLRaw, unitsSheet);
+            const sheetAreaIn2 = sheetWIn * sheetLIn;
+
+            let totals = {
+                original: { areaIn2: 0, sqft: 0, sheets: 0 },
+                adjusted: { areaIn2: 0, sqft: 0, sheets: 0 },
+                oversized: { areaIn2: 0, sqft: 0, sheets: 0 }
+            };
+
+            const processed = rawData.map(row => {
+                const qty = parseFloat(row[0]) || 0;
+                const origWIn = parseFloat(row[1]) || 0;
+                const origHIn = parseFloat(row[2]) || 0;
+                const part = row[3] || '';
+                const cab = row[4] || '';
+                const extra = row.slice(5).filter(x => x).join(', ');
+
+                // Calculations in Inches
+                const adjWIn = origWIn - (2 * ebIn);
+                const adjHIn = origHIn - (2 * ebIn);
+                const overWIn = origWIn + osIn;
+                const overHIn = origHIn + osIn;
+
+                // Accumulate areas for SqFt and Sheet estimation
+                totals.original.areaIn2 += (qty * origWIn * origHIn);
+                totals.adjusted.areaIn2 += (qty * adjWIn * adjHIn);
+                totals.oversized.areaIn2 += (qty * overWIn * overHIn);
+
+                return {
+                    qty, part, cab, extra,
+                    original: { w: fromIn(origWIn, unitsMain), h: fromIn(origHIn, unitsMain) },
+                    adjusted: { w: fromIn(adjWIn, unitsMain), h: fromIn(adjHIn, unitsMain) },
+                    oversized: { w: fromIn(overWIn, unitsMain), h: fromIn(overHIn, unitsMain) }
+                };
+            });
+
+            // Final totals math
+            Object.keys(totals).forEach(k => {
+                totals[k].sqft = totals[k].areaIn2 / 144;
+                if (sheetAreaIn2 > 0) {
+                    totals[k].sheets = Math.ceil(totals[k].areaIn2 / (sheetAreaIn2 * (yieldPct / 100)));
+                }
+            });
+
+            renderTables(processed, totals);
+        }
+
+        function renderTables(data, totals) {
+            const wrap = document.getElementById('results_wrap');
+            if (!wrap) return;
+            wrap.style.opacity = '0.5';
+            
+            setTimeout(() => {
+                const empty = document.getElementById('empty_msg');
+                if (empty) empty.style.display = 'none';
+                
+                const help = document.getElementById('help_card');
+                if (help) help.style.display = 'none';
+
+                // Clear everything EXCEPT the templates
+                const children = Array.from(wrap.children);
+                children.forEach(child => {
+                    if (child.id !== 'empty_msg' && child.id !== 'help_card') {
+                        wrap.removeChild(child);
+                    }
+                });
+
+                const sections = [
+                    { id: 'original', title: 'Original Dimensions', badge: 'badge-original' },
+                    { id: 'adjusted', title: 'Adjusted for Edgeband', badge: 'badge-adjusted' },
+                    { id: 'oversized', title: 'Oversized (Raw + Add)', badge: 'badge-oversized' }
+                ];
+
+                sections.forEach(sec => {
+                    const card = document.createElement('div');
+                    card.className = 'card table-card';
+                    card.style.marginBottom = '20px';
+                    
+                    const t = totals[sec.id];
+                    
+                    let rowsHtml = data.map(d => {
+                        const dim = d[sec.id];
+                        return `
+                            <tr>
+                                <td style="font-weight: 800;">${d.qty}</td>
+                                <td style="color: var(--accent); font-weight: 900;">${dim.w.toFixed(3)}${unitsMain}</td>
+                                <td style="color: var(--accent); font-weight: 900;">${dim.h.toFixed(3)}${unitsMain}</td>
+                                <td>${d.part}</td>
+                                <td>${d.cab}</td>
+                                <td style="color: #94a3b8; font-size: 11px;">${d.extra}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    card.innerHTML = `
+                        <div class="table-header">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span class="badge ${sec.badge}">${sec.id}</span>
+                                <h3>${sec.title}</h3>
+                            </div>
+                            <div style="text-align: right; font-size: 13px; color: var(--primary);">
+                                <div style="font-weight: 800; color: var(--accent);">
+                                    ${t.sqft.toFixed(2)} SqFt
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">
+                                    ~${t.sheets} Sheets (${document.getElementById('yield_val').value}% yield)
+                                </div>
+                            </div>
+                            <div class="export-btns" style="margin-left: 15px;">
+                                <button class="btn-sm" onclick="exportCsv('${sec.id}')">Download CSV</button>
+                                <button class="btn-sm" onclick="exportPdf('${sec.id}', '${sec.title}')">Download PDF</button>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th width="50">Qty</th>
+                                        <th>Width</th>
+                                        <th>Height</th>
+                                        <th>Part</th>
+                                        <th>Cabinet</th>
+                                        <th>Extra Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rowsHtml}</tbody>
+                            </table>
+                        </div>
+                    `;
+                    wrap.appendChild(card);
+                });
+                wrap.style.opacity = '1';
+            }, 50);
+        }
+
+        function proceed() {
+            if (!rawData.length) { 
+                alert("Please upload a CSV file first."); 
+                return; 
+            }
+            calculate();
+            const btn = document.querySelector('.btn-primary');
+            const oldText = btn.innerText;
+            btn.innerText = 'Updated!';
+            btn.style.background = '#10b981';
+            setTimeout(() => {
+                btn.innerText = oldText;
+                btn.style.background = '';
+            }, 1000);
+        }
+
+        function exportCsv(type) {
+            const ebRaw = parseFloat(document.getElementById('edgeband_val').value) || 0;
+            const osRaw = parseFloat(document.getElementById('oversize_val').value) || 0;
+            const ebIn = toIn(ebRaw, unitsEb);
+            const osIn = toIn(osRaw, unitsOs);
+            
+            const headers = ["Qty", "Width", "Height", "Part", "Cabinet", "Extra Info"];
+            const csvData = [headers];
+
+            rawData.forEach(row => {
+                const qty = row[0];
+                const origWIn = parseFloat(row[1]) || 0;
+                const origHIn = parseFloat(row[2]) || 0;
+                
+                let fwIn, fhIn;
+                if (type === 'original') { fwIn = origWIn; fhIn = origHIn; }
+                else if (type === 'adjusted') { fwIn = origWIn - (2*ebIn); fhIn = origHIn - (2*ebIn); }
+                else { fwIn = origWIn + osIn; fhIn = origHIn + osIn; }
+
+                csvData.push([qty, fromIn(fwIn, unitsMain).toFixed(3), fromIn(fhIn, unitsMain).toFixed(3), row[3] || '', row[4] || '', row.slice(5).join(' ')]);
+            });
+
+            const csv = Papa.unparse(csvData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `door_${type}_${unitsMain}.csv`);
+            link.click();
+        }
+
+        async function exportPdf(type, title) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const eb = document.getElementById('edgeband_val').value;
+            const os = document.getElementById('oversize_val').value;
+            const yieldPct = document.getElementById('yield_val').value;
+            const sheetW = document.getElementById('sheet_w').value;
+            const sheetL = document.getElementById('sheet_l').value;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("INNOSAW DOOR REPORT", 14, 20);
+            
+            doc.setFontSize(14);
+            doc.setTextColor(40);
+            doc.text(title.toUpperCase(), 14, 30);
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100);
+            doc.text(`Output Units: ${unitsMain} | Edgeband: ${eb}${unitsEb} | Oversize: ${os}${unitsOs}`, 14, 38);
+            doc.text(`Sheet: ${sheetW}x${sheetL}${unitsSheet} | Est. Yield: ${yieldPct}% | Generated: ${new Date().toLocaleString()}`, 14, 44);
+
+            const ebRaw = parseFloat(eb) || 0;
+            const osRaw = parseFloat(os) || 0;
+            const ebIn = toIn(ebRaw, unitsEb);
+            const osIn = toIn(osRaw, unitsOs);
+            const sheetWIn = toIn(parseFloat(sheetW), unitsSheet);
+            const sheetLIn = toIn(parseFloat(sheetL), unitsSheet);
+            const sheetAreaIn2 = sheetWIn * sheetLIn;
+
+            let totalAreaIn2 = 0;
+            const tableData = rawData.map(row => {
+                const qty = parseFloat(row[0]) || 0;
+                const origWIn = parseFloat(row[1]) || 0;
+                const origHIn = parseFloat(row[2]) || 0;
+                let fwIn, fhIn;
+                if (type === 'original') { fwIn = origWIn; fhIn = origHIn; }
+                else if (type === 'adjusted') { fwIn = origWIn - (2*ebIn); fhIn = origHIn - (2*ebIn); }
+                else { fwIn = origWIn + osIn; fhIn = origHIn + osIn; }
+
+                totalAreaIn2 += (qty * fwIn * fhIn);
+
+                return [
+                    qty, 
+                    fromIn(fwIn, unitsMain).toFixed(3), 
+                    fromIn(fhIn, unitsMain).toFixed(3), 
+                    row[3] || '', 
+                    row[4] || '', 
+                    row.slice(5).join(' ')
+                ];
+            });
+
+            const totalSqFt = totalAreaIn2 / 144;
+            const estSheets = Math.ceil(totalAreaIn2 / (sheetAreaIn2 * (parseFloat(yieldPct)/100)));
+
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(37, 99, 235);
+            doc.text(`TOTAL SQFT: ${totalSqFt.toFixed(2)}`, 14, 52);
+            doc.text(`EST. SHEETS: ${estSheets}`, 80, 52);
+
+            doc.autoTable({
+                startY: 58,
+                head: [["Qty", "Width", "Height", "Part", "Cabinet", "Extra Data"]],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [13, 33, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
+                styles: { fontSize: 9 }
+            });
+
+            doc.save(`door_report_${type}_${unitsMain}.pdf`);
+        }
+    </script>
+</body>
+</html>

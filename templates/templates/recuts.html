@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recut Tracking - Manufacturing Dashboard</title>
+    <link rel="stylesheet" href="/static/common.css?v=20260408c">
+    <link rel="stylesheet" href="/static/searchable-select.css?v=20260116">
+    <link rel="stylesheet" href="/static/mobile-nav.css?v=20260118">
+    <script src="/static/theme.js?v=20260408c"></script>
+    <script src="/static/mobile-nav.js?v=20260118"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        /* Page-specific styles only - common styles are in common.css */
+
+        .actions-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+        .actions-top { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+        .actions-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .recut-select-col { width: 52px; text-align: center; vertical-align: middle; padding: 8px 6px !important; }
+        .recut-checkbox-hit {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            min-height: 44px;
+            cursor: pointer;
+            margin: -6px;
+        }
+        .recut-row-checkbox,
+        #select-all-recuts {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            min-height: 24px;
+            cursor: pointer;
+            accent-color: var(--accent-primary, #2563eb);
+        }
+        .primary-btn { padding: 10px 16px; background: var(--btn-primary-bg); color: var(--btn-primary-text); border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; }
+        .primary-btn:hover { background: var(--accent-hover); }
+        .secondary-btn { padding: 10px 16px; background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; }
+        .secondary-btn:hover { background: #5a6268; }
+        .secondary-btn.danger-btn { background: #dc3545; color: #fff; }
+        .secondary-btn.danger-btn:hover { background: #bb2d3b; }
+        .secondary-btn.danger-btn:disabled { background: #6c757d; opacity: 0.65; }
+
+        .filters { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px var(--card-shadow); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .filters select, .filters input { padding: 8px 12px; border: 1px solid var(--input-border); border-radius: 5px; font-size: 14px; background: var(--input-bg); color: var(--text-primary); }
+        .filters button { padding: 8px 20px; background: var(--btn-primary-bg); color: var(--btn-primary-text); border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .filters button:hover { background: var(--accent-hover); }
+
+        .table-wrap { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px var(--card-shadow); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; background: var(--bg-tertiary); color: var(--text-primary); font-weight: 600; border-bottom: 2px solid var(--border-color); font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); font-size: 14px; }
+        .cell-sub { display: block; font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.25; }
+        .cell-sub.export-hint { color: var(--accent-primary); font-weight: 600; }
+        .nowrap { white-space: nowrap; }
+        tr:hover { background: var(--bg-tertiary); }
+        .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin-bottom: 20px; display:none; }
+        .thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-color); }
+        .cv-recuts-tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.25;
+            white-space: normal;
+            max-width: 260px;
+        }
+        .mozaik-export-tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.25;
+            white-space: normal;
+            max-width: 260px;
+        }
+        .export-tag-file {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            word-break: break-all;
+            opacity: 0.95;
+        }
+        .export-tag-when {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+        .export-tag-who {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
+        .modal {
+            width: 100%;
+            max-width: 760px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px var(--card-shadow);
+            overflow: hidden;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header { background: var(--header-bg); color: var(--header-text); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .modal-header h2 { font-size: 16px; }
+        .modal-body { padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .form-field { display: flex; flex-direction: column; gap: 6px; }
+        .form-field label { font-size: 12px; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: .4px; }
+        .form-field input, .form-field select, .form-field textarea { padding: 10px 12px; border: 1px solid var(--input-border); border-radius: 8px; font-size: 14px; background: var(--input-bg); color: var(--text-primary); }
+        .form-field textarea { min-height: 90px; resize: vertical; }
+        .modal-footer { padding: 14px 16px; display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-tertiary); border-top: 1px solid var(--border-color); position: sticky; bottom: 0; }
+        @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
+
+        .scan-box { background: var(--bg-tertiary); border: 1px dashed var(--border-color); padding: 10px; border-radius: 10px; position: relative; }
+        video { width: 100%; border-radius: 10px; background: #000; }
+        #reader { width: 100%; min-height: 250px; background: #000; border-radius: 10px; overflow: hidden; }
+        #reader video { width: 100% !important; height: auto !important; }
+        #camera_stop_btn { position: absolute; top: 15px; right: 15px; z-index: 10; background: #ef4444; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: none; }
+
+        .recut-toast {
+            position: fixed;
+            left: 50%;
+            bottom: 22px;
+            transform: translateX(-50%);
+            background: rgba(13, 33, 55, 0.94);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 5000;
+            display: none;
+            max-width: min(92vw, 520px);
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            line-height: 1.4;
+        }
+        .recut-toast.show { display: block; }
+        .recut-toast.processing { background: rgba(37, 99, 235, 0.95); }
+        .recut-toast.success { background: rgba(5, 150, 105, 0.95); }
+        .recut-toast.error { background: rgba(185, 28, 28, 0.95); }
+    </style>
+</head>
+<body>
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile_menu_overlay" id="mobile_menu_overlay" onclick="closeMobileMenu()"></div>
+    
+    <!-- Mobile Slide Menu -->
+    <div class="mobile_slide_menu" id="mobile_slide_menu">
+      <div class="mobile_menu_header">
+        <h3>Menu</h3>
+        <button class="mobile_menu_close" onclick="closeMobileMenu()">×</button>
+      </div>
+      <nav class="mobile_menu_nav">
+        <div class="mobile_menu_section">Main</div>
+        <a href="/shop">🏠 Dashboard</a>
+        <button class="mobile_menu_expand" onclick="toggleMobileSubmenu(this)">📊 Reports</button>
+        <div class="mobile_menu_submenu">
+          <a href="/reports">📈 Main Report</a>
+          <a href="/reports#scan_log">📋 Scan Log</a>
+          <a href="/reports#part_search">🔍 Part Search</a>
+          <a href="/reports#detailed">📊 Detailed Reports</a>
+        </div>
+        <a href="/labels">🏷️ Labels</a>
+        <a href="/bins">📦 Bins</a>
+        <div class="mobile_menu_section">Production</div>
+        <a href="/mobile">📱 Mobile Scan</a>
+        <a href="/maintenance">🔧 Maintenance</a>
+        <a href="/inventory">📦 Inventory</a>
+        <a href="/scans">📝 Scan Log</a>
+        <a href="/tools">🛠️ Tools</a>
+        <a href="/recuts" class="active">🔄 Recuts</a>
+        <div class="mobile_menu_section">Office</div>
+        <a href="/chat">💬 Chat</a>
+        <a href="/boards">📋 Boards</a>
+        <a href="/schedule">📅 Schedule</a>
+        <a href="/notifications">🔔 Notifications</a>
+        <div class="mobile_menu_section">System</div>
+        <a href="/stations">⚙️ Admin</a>
+        <a href="/help">❓ Help</a>
+        <a href="/choose_shop">🔄 Switch Shop</a>
+        <a href="#" onclick="openMobileNavSettings(); closeMobileMenu(); return false;">📱 Customize Nav</a>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout_form').submit();">🚪 Logout</a>
+      </nav>
+    </div>
+
+    <div class="header">
+        <div class="mobile_header_row">
+          <button class="mobile_hamburger" onclick="openMobileMenu()">☰</button>
+          <h1>🔄 Recuts</h1>
+          <span class="notif_bell_wrap" style="margin-left:auto;">
+            <button id="notif_btn_mobile" class="notif_btn" type="button" style="padding:4px 8px;">🔔<span id="notif_badge_mobile" class="notif_badge">0</span></button>
+          </span>
+        </div>
+        <h1 class="desktop_only">🧾 Recut Tracking</h1>
+        <div class="subtitle desktop_only">Track recuts, patterns, and where issues are found</div>
+        <div class="nav_primary desktop_only">
+            <a class="nav_btn" href="/shop">Dashboard</a>
+            <a class="nav_btn" href="/reports">Reports</a>
+            <a class="nav_btn" href="/chat">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/stations">Admin</a>
+            <a class="nav_btn" href="/help">Help</a>
+            <a class="nav_btn" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <span class="notif_bell_wrap">
+              <button id="notif_btn" class="notif_btn" type="button" onclick="innosawToggleNotifMenu()">🔔<span id="notif_badge" class="notif_badge">0</span></button>
+              <div id="notif_menu" class="notif_menu"></div>
+            </span>
+            <form method="post" action="/logout" id="logout_form" style="display:inline;">
+              <button class="btn btn-secondary" type="submit" style="padding:8px 10px;">Logout</button>
+            </form>
+        </div>
+    </div>
+    <div class="nav_secondary desktop_only" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/mobile">Mobile Scan</a>
+        <a class="nav_btn" href="/maintenance">Maintenance</a>
+        <a class="nav_btn" href="/inventory">Inventory</a>
+        <a class="nav_btn" href="/tools">Tools</a>
+        <a class="nav_btn active" href="/recuts">Recuts</a>
+    </div>
+    
+    <!-- Mobile Bottom Nav -->
+    <div class="mobile_bottom_nav" id="mobile_bottom_nav"></div>
+
+    <div class="container">
+        <div class="actions-bar">
+            <div class="actions-top">
+                <button class="primary-btn" onclick="openAddModal()">+ Add Recut</button>
+                <div style="color:#556; font-size:13px;">Tip: Scan a part label with your phone camera to auto-fill fields.</div>
+            </div>
+            <div class="actions-toolbar">
+                <button class="primary-btn" id="export-recuts-btn" onclick="exportSelectedRecuts()" disabled title="Export recut files — routes CV jobs to .pnx and Mozaik jobs to .xml/.zip based on label import source.">Export Recuts</button>
+                <button class="secondary-btn" id="complete-selected-btn" onclick="completeSelectedRecuts(true)" disabled title="Mark checked recuts as completed">Complete selected</button>
+                <button class="secondary-btn" id="reopen-selected-btn" onclick="completeSelectedRecuts(false)" disabled title="Mark checked recuts as not completed">Reopen selected</button>
+                <button class="secondary-btn danger-btn" id="delete-selected-btn" onclick="deleteSelectedRecuts()" disabled title="Delete all checked recuts">Delete selected</button>
+                <button class="secondary-btn" id="clear-export-stamps-btn" onclick="clearSelectedExportStamps()" disabled style="display:none;" title="Admin: clear CV/Mozaik exported stamps on selected rows (for demos)">Clear export stamps</button>
+                <span id="selection-count" style="font-size:13px; color:#556;">0 selected</span>
+            </div>
+        </div>
+
+        <div class="filters">
+            <select id="machine-filter">
+                <option value="">All Machines</option>
+                <option value="CNC">CNC</option>
+                <option value="H10">H10</option>
+                <option value="Edge">Edge</option>
+                <option value="Dowel">Dowel</option>
+                <option value="Sort">Sort</option>
+                <option value="Pull">Pull</option>
+                <option value="Assembly">Assembly</option>
+                <option value="QC">QC</option>
+                <option value="Wrap">Wrap</option>
+                <option value="Ship">Ship</option>
+            </select>
+            <select id="type-filter">
+                <option value="">All Types</option>
+                <option value="recut">Recut</option>
+                <option value="rework">Rework</option>
+            </select>
+            <select id="fix-station-filter">
+                <option value="">Fix Station (Any)</option>
+                <option value="CNC">CNC</option>
+                <option value="H10">H10</option>
+                <option value="Edge">Edge</option>
+                <option value="Dowel">Dowel</option>
+                <option value="Sort">Sort</option>
+                <option value="Pull">Pull</option>
+                <option value="Assembly">Assembly</option>
+                <option value="QC">QC</option>
+                <option value="Wrap">Wrap</option>
+                <option value="Ship">Ship</option>
+            </select>
+            <div class="searchable-select-wrap" id="job-filter-wrap" style="min-width:180px;">
+                <input type="text" class="searchable-select-input" id="job-filter-input" placeholder="Type to filter jobs..." autocomplete="off">
+                <input type="hidden" id="job-filter" value="">
+                <div class="searchable-select-dropdown" id="job-filter-dropdown"></div>
+            </div>
+            <input id="gcode-filter" placeholder="Gcode contains..." style="width:160px;" />
+            <input id="part-filter" placeholder="Part name contains..." style="width:180px;" />
+            <input id="operator-filter" placeholder="Reported By (exact)" style="width:160px;" />
+            <input id="caused-by-filter" placeholder="Caused By (exact)" style="width:160px;" />
+            <input id="q-filter" placeholder="Search (job/cab/part/gcode/notes)..." style="width:260px;" />
+            <input type="number" id="limit-filter" placeholder="Limit" value="100" style="width: 100px;">
+            <button onclick="loadRecuts()">Apply</button>
+            <button onclick="resetFilters()" style="background:#6c757d;">Reset</button>
+        </div>
+
+        <div id="error" class="error"></div>
+        <div class="table-wrap">
+            <div id="loading" class="loading">Loading recut logs...</div>
+            <table id="recuts-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th class="recut-select-col"><label class="recut-checkbox-hit" title="Select all visible"><input type="checkbox" class="recut-row-checkbox" id="select-all-recuts"></label></th>
+                        <th>Date/Time</th>
+                        <th>Machine</th>
+                        <th>Type</th>
+                        <th>Fix Station</th>
+                        <th>Job</th>
+                        <th>Cabinet</th>
+                        <th>Cab #</th>
+                        <th>Part</th>
+                        <th>Material</th>
+                        <th>Run</th>
+                        <th>Size</th>
+                        <th>Gcode</th>
+                        <th>Reported By</th>
+                        <th>Caused By</th>
+                        <th>Reason</th>
+                        <th>CV Recuts</th>
+                        <th>Mozaik Recuts</th>
+                        <th>Photo</th>
+                        <th>Completed</th>
+                        <th>Completed At</th>
+                        <th>Completed By</th>
+                        <th></th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="recuts-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="add-modal" class="modal-backdrop" onclick="closeAddModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Add Recut</h2>
+                <button class="secondary-btn" onclick="closeAddModal()">Close</button>
+            </div>
+            <div class="modal-body">
+                <div id="add-error" class="error" style="display:none;"></div>
+
+                <div class="scan-box" style="margin-bottom:12px;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="primary-btn" onclick="startQrScan()">Scan Part QR (Camera)</button>
+                        <button class="secondary-btn" onclick="stopQrScan()">Stop</button>
+                        <div style="font-size:13px; color:#555;">If your phone doesn't support it, just use a scanner or type/paste.</div>
+                    </div>
+                    <button id="camera_stop_btn" onclick="stopQrScan()">Stop Camera</button>
+                    <div id="scan-area" style="display:none; margin-top:10px;">
+                        <div id="reader" style="width:100%; border-radius:10px; overflow:hidden;"></div>
+                        <video id="qr-video" playsinline style="display:none;"></video>
+                        <div style="margin-top:8px; font-size:13px; color:#333;">
+                            Last scan: <span id="qr-last" style="font-weight:800;">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scan-box" style="margin-bottom:12px;">
+                    <div style="font-size:13px; font-weight:800; margin-bottom:6px;">Paste QR Text (optional)</div>
+                    <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                        <textarea id="add-raw" style="flex:1; min-width:260px; min-height:70px; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:13px;" placeholder="Paste the full part QR text here (gcode,part#,job,cab,...)"></textarea>
+                        <button class="secondary-btn" onclick="parsePastedQr()">Parse</button>
+                    </div>
+                    <div style="margin-top:6px; font-size:12px; color:#666;">This works even when camera scanning is blocked.</div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Machine</label>
+                        <select id="add-machine" required>
+                            <option value="">Select...</option>
+                            <option value="CNC">CNC</option>
+                            <option value="H10">H10</option>
+                            <option value="Edge">Edge</option>
+                            <option value="Dowel">Dowel</option>
+                            <option value="Sort">Sort</option>
+                            <option value="Pull">Pull</option>
+                            <option value="Assembly">Assembly</option>
+                            <option value="QC">QC</option>
+                            <option value="Wrap">Wrap</option>
+                            <option value="Ship">Ship</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Type</label>
+                        <select id="add-type">
+                            <option value="recut">Recut</option>
+                            <option value="rework">Rework</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Fix Station</label>
+                        <select id="add-fix-station">
+                            <option value="">(optional)</option>
+                            <option value="CNC">CNC</option>
+                            <option value="H10">H10</option>
+                            <option value="Edge">Edge</option>
+                            <option value="Dowel">Dowel</option>
+                            <option value="Sort">Sort</option>
+                            <option value="Pull">Pull</option>
+                            <option value="Assembly">Assembly</option>
+                            <option value="QC">QC</option>
+                            <option value="Wrap">Wrap</option>
+                            <option value="Ship">Ship</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Reported By</label>
+                        <input id="add-operator" placeholder="e.g. JM" />
+                    </div>
+                    <div class="form-field">
+                        <label>Caused By</label>
+                        <input id="add-caused-by" placeholder="e.g. AB" />
+                    </div>
+                    <div class="form-field">
+                        <label>Job Name</label>
+                        <input id="add-job" placeholder="Job" />
+                    </div>
+                    <div class="form-field">
+                        <label>Cabinet Name</label>
+                        <input id="add-cabinet" placeholder="Cabinet" />
+                    </div>
+                    <div class="form-field">
+                        <label>Part Name</label>
+                        <input id="add-part" placeholder="Part" />
+                    </div>
+                    <div class="form-field">
+                        <label>Gcode</label>
+                        <input id="add-gcode" placeholder="S01R01.TCN" />
+                    </div>
+                    <div class="form-field">
+                        <label>Reason</label>
+                        <select id="add-reason">
+                            <option value="defect">Defect</option>
+                            <option value="damage">Damage</option>
+                            <option value="wrong_material">Wrong Material</option>
+                            <option value="machine_error">Machine Error</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Photo (optional)</label>
+                        <input id="add-photo" type="file" accept="image/*" capture="environment" />
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label>Notes</label>
+                        <textarea id="add-notes" placeholder="Where was it found? What was wrong? Any details..."></textarea>
+                    </div>
+                    <div class="form-field">
+                        <label>Assign To User (optional)</label>
+                        <select id="add-assigned-user">
+                            <option value="">-- Not assigned --</option>
+                        </select>
+                        <div class="small" style="margin-top:4px; color:#666;">Tag a user to notify them about this recut</div>
+                    </div>
+                    <div class="form-field">
+                        <label>Assign To Station (optional)</label>
+                        <select id="add-assigned-station">
+                            <option value="">-- Not assigned --</option>
+                        </select>
+                        <div class="small" style="margin-top:4px; color:#666;">Tag a station to notify users at that station</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" onclick="closeAddModal()">Cancel</button>
+                <button class="primary-btn" onclick="submitRecut()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="recut-toast" class="recut-toast" role="status" aria-live="polite"></div>
+
+    <script>
+        let recutsData = [];
+        let stream = null;
+        let detector = null;
+        let scanTimer = null;
+
+        function fixExternalLinks() {
+            const host = window.location.hostname || 'localhost';
+            const proto = (window.location.protocol === 'https:') ? 'https' : 'http';
+            const portStr = window.location.port || '';
+
+            const hostParts = host.split('.');
+            const sub = hostParts[0];
+            const baseDomain = (hostParts.length >= 3 && (sub === 'qr' || sub === 'bins'))
+                ? hostParts.slice(1).join('.')
+                : null;
+            const onPublicHttps = !!baseDomain && proto === 'https';
+            const behindProxyNoPorts = !portStr || portStr === '80' || portStr === '443';
+
+            document.querySelectorAll('.ext-link').forEach(a => {
+                const port = a.getAttribute('data-port');
+                const path = a.getAttribute('data-path') || '/';
+                if (port === '5007' && (onPublicHttps || behindProxyNoPorts)) {
+                    a.style.display = 'none';
+                    return;
+                }
+
+                if (port === '5000') {
+                    if (onPublicHttps) {
+                        a.href = `https://bins.${baseDomain}${path}`;
+                        return;
+                    }
+                    if (behindProxyNoPorts) {
+                        const p = path.startsWith('/') ? path : `/${path}`;
+                        a.href = `${proto}://${host}/bins${p}`;
+                        return;
+                    }
+                }
+
+                if (port) a.href = `${proto}://${host}:${port}${path}`;
+            });
+        }
+
+        async function openAddModal() {
+            document.getElementById('add-error').style.display = 'none';
+            document.getElementById('add-modal').style.display = 'flex';
+            // Auto-fill operator field with logged-in user's operator_code
+            try {
+                const whoamiRes = await fetch('/api/whoami');
+                const whoamiData = await whoamiRes.json();
+                if (whoamiData.operator_code) {
+                    const addOp = document.getElementById('add-operator');
+                    if (addOp && !addOp.value.trim()) {
+                        addOp.value = whoamiData.operator_code;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to auto-fill operator from logged-in user", e);
+            }
+            // Load users and stations for assignment dropdowns
+            await loadAssignmentOptions();
+        }
+        
+        async function loadAssignmentOptions() {
+            try {
+                // Load users from chat users endpoint
+                const usersRes = await fetch('/api/chat/users');
+                if (!usersRes.ok) {
+                    console.warn('Failed to load users:', usersRes.status, usersRes.statusText);
+                    // Set empty dropdown if API fails
+                    const userSelect = document.getElementById('add-assigned-user');
+                    if (userSelect) {
+                        userSelect.innerHTML = '<option value="">-- Not assigned --</option>';
+                    }
+                } else {
+                    const usersData = await usersRes.json();
+                    const users = Array.isArray(usersData.users) ? usersData.users : [];
+                    const userSelect = document.getElementById('add-assigned-user');
+                    if (userSelect) {
+                        userSelect.innerHTML = '<option value="">-- Not assigned --</option>' +
+                            users.filter(u => u.active !== false).map(u => 
+                                `<option value="${u.user_id}">${escapeHtml((u.display_name || u.email || `User ${u.user_id}`))}</option>`
+                            ).join('');
+                    }
+                }
+                
+                // Load stations
+                const stationsRes = await fetch('/api/admin/stations');
+                if (!stationsRes.ok) {
+                    console.warn('Failed to load stations:', stationsRes.status, stationsRes.statusText);
+                    // Set empty dropdown if API fails
+                    const stationSelect = document.getElementById('add-assigned-station');
+                    if (stationSelect) {
+                        stationSelect.innerHTML = '<option value="">-- Not assigned --</option>';
+                    }
+                } else {
+                    const stationsData = await stationsRes.json();
+                    const stations = Array.isArray(stationsData) ? stationsData : (stationsData.stations || []);
+                    const stationSelect = document.getElementById('add-assigned-station');
+                    if (stationSelect) {
+                        stationSelect.innerHTML = '<option value="">-- Not assigned --</option>' +
+                            stations.filter(s => s.active !== false).map(s => 
+                                `<option value="${s.id}">${escapeHtml(s.station_code + (s.display_name ? ` — ${s.display_name}` : ''))}</option>`
+                            ).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load assignment options:', e);
+                // Set empty dropdowns on error
+                const userSelect = document.getElementById('add-assigned-user');
+                const stationSelect = document.getElementById('add-assigned-station');
+                if (userSelect) userSelect.innerHTML = '<option value="">-- Not assigned --</option>';
+                if (stationSelect) stationSelect.innerHTML = '<option value="">-- Not assigned --</option>';
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        function closeAddModal(evt) {
+            if (evt && evt.target && evt.target.classList && !evt.target.classList.contains('modal-backdrop')) return;
+            stopQrScan();
+            document.getElementById('add-modal').style.display = 'none';
+        }
+
+        function resetFilters() {
+            document.getElementById('machine-filter').value = '';
+            document.getElementById('type-filter').value = '';
+            document.getElementById('fix-station-filter').value = '';
+            document.getElementById('job-filter').value = '';
+            document.getElementById('job-filter-input').value = '';
+            document.getElementById('gcode-filter').value = '';
+            document.getElementById('part-filter').value = '';
+            document.getElementById('operator-filter').value = '';
+            document.getElementById('caused-by-filter').value = '';
+            document.getElementById('q-filter').value = '';
+            document.getElementById('limit-filter').value = '100';
+            loadRecuts();
+        }
+
+        let lastRecutsFingerprint = '';
+        let recutsRefreshTimer = null;
+        const selectedRecutIds = new Set();
+        let recutsIsAdmin = false;
+        let recutExportInProgress = false;
+        let recutToastHideTimer = null;
+
+        function recutsDataFingerprint(rows) {
+            return (rows || []).map(r => [
+                r.id,
+                r.timestamp,
+                r.recut_completed,
+                r.completed_at,
+                r.completed_by,
+                r.desktop_sent_at,
+                r.desktop_sent_by,
+                r.desktop_sent_filename,
+                r.mozaik_exported_at,
+                r.mozaik_exported_by,
+                r.mozaik_exported_filename,
+                r.matched_source_type,
+                r.part_name,
+                r.material,
+                r.material_thickness,
+                r.run_name,
+                r.part_length,
+                r.part_width,
+                r.export_part_id,
+                r.match_debug,
+            ].join('|')).join('\n');
+        }
+
+        function pruneRecutSelection() {
+            const visible = new Set(recutsData.map(r => r.id));
+            Array.from(selectedRecutIds).forEach(id => {
+                if (!visible.has(id)) selectedRecutIds.delete(id);
+            });
+        }
+
+        async function loadRecuts(options = {}) {
+            const silent = !!(options && options.silent);
+            const force = !!(options && options.force);
+            const loading = document.getElementById('loading');
+            const table = document.getElementById('recuts-table');
+            const err = document.getElementById('error');
+            err.style.display = 'none';
+            err.textContent = '';
+            if (!silent) {
+                loading.style.display = 'block';
+                table.style.display = 'none';
+            }
+
+            const params = new URLSearchParams();
+            const limit = document.getElementById('limit-filter').value || 100;
+            params.set('limit', limit);
+            const machine = document.getElementById('machine-filter').value;
+            const type = document.getElementById('type-filter').value;
+            const fixStation = document.getElementById('fix-station-filter').value;
+            const job = document.getElementById('job-filter').value;
+            const gcode = document.getElementById('gcode-filter').value;
+            const part = document.getElementById('part-filter').value;
+            const op = document.getElementById('operator-filter').value;
+            const causedBy = document.getElementById('caused-by-filter').value;
+            const q = document.getElementById('q-filter').value;
+            if (machine) params.set('machine', machine);
+            if (type) params.set('request_type', type);
+            if (fixStation) params.set('fix_station', fixStation);
+            if (job) params.set('job_name', job);
+            if (gcode) params.set('gcode', gcode);
+            if (part) params.set('part_name', part);
+            if (op) params.set('operator_id', op);
+            if (causedBy) params.set('caused_by', causedBy);
+            if (q) params.set('q', q);
+
+            try {
+                const res = await fetch(`/api/recuts?${params.toString()}`);
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                const nextData = data.recuts || [];
+                const fp = recutsDataFingerprint(nextData);
+                if (!force && fp === lastRecutsFingerprint) {
+                    if (!silent) {
+                        loading.style.display = 'none';
+                        table.style.display = 'table';
+                    }
+                    return;
+                }
+                lastRecutsFingerprint = fp;
+                recutsData = nextData;
+                pruneRecutSelection();
+                updateTable();
+                loading.style.display = 'none';
+                table.style.display = 'table';
+            } catch (e) {
+                loading.style.display = 'none';
+                if (!silent || recutsData.length === 0) {
+                    table.style.display = recutsData.length ? 'table' : 'none';
+                }
+                err.textContent = `Error: ${e.message}`;
+                err.style.display = 'block';
+            }
+        }
+
+        function scheduleRecutsRefresh() {
+            if (document.hidden) return;
+            if (selectedRecutIds.size > 0) return;
+            loadRecuts({ silent: true });
+        }
+
+        function startRecutsAutoRefresh() {
+            if (recutsRefreshTimer) clearInterval(recutsRefreshTimer);
+            recutsRefreshTimer = setInterval(scheduleRecutsRefresh, 60000);
+        }
+
+        function updateSelectionUi() {
+            const count = selectedRecutIds.size;
+            const label = document.getElementById('selection-count');
+            if (label) label.textContent = `${count} selected`;
+            const exportRecutsBtn = document.getElementById('export-recuts-btn');
+            const completeBtn = document.getElementById('complete-selected-btn');
+            const reopenBtn = document.getElementById('reopen-selected-btn');
+            const deleteBtn = document.getElementById('delete-selected-btn');
+            const clearStampsBtn = document.getElementById('clear-export-stamps-btn');
+            const disabled = count === 0 || recutExportInProgress;
+            if (exportRecutsBtn) exportRecutsBtn.disabled = disabled;
+            if (completeBtn) completeBtn.disabled = disabled;
+            if (reopenBtn) reopenBtn.disabled = disabled;
+            if (deleteBtn) deleteBtn.disabled = disabled;
+            if (clearStampsBtn) clearStampsBtn.disabled = disabled;
+            const selectAll = document.getElementById('select-all-recuts');
+            if (selectAll) {
+                const visibleIds = recutsData.map(r => r.id);
+                const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedRecutIds.has(id));
+                selectAll.checked = allSelected;
+                selectAll.indeterminate = !allSelected && visibleIds.some(id => selectedRecutIds.has(id));
+            }
+        }
+
+        function toggleRecutSelection(id, checked) {
+            if (checked) selectedRecutIds.add(id);
+            else selectedRecutIds.delete(id);
+            updateSelectionUi();
+        }
+
+        function toggleSelectAll(checked) {
+            recutsData.forEach(r => {
+                if (checked) selectedRecutIds.add(r.id);
+                else selectedRecutIds.delete(r.id);
+            });
+            updateTable();
+        }
+
+        function getDesktopApiBase() {
+            try {
+                const stored = localStorage.getItem('innosaw_desktop_api');
+                if (stored && stored.trim()) return stored.trim().replace(/\/$/, '');
+            } catch (_) {}
+            return 'http://localhost:4000';
+        }
+
+        function showRecutToast(msg, opts = {}) {
+            const el = document.getElementById('recut-toast');
+            if (!el) return;
+            clearTimeout(recutToastHideTimer);
+            el.textContent = msg;
+            el.className = 'recut-toast show'
+                + (opts.processing ? ' processing' : '')
+                + (opts.success ? ' success' : '')
+                + (opts.error ? ' error' : '');
+            if (!opts.sticky) {
+                recutToastHideTimer = setTimeout(() => {
+                    el.className = 'recut-toast';
+                }, opts.duration || (opts.error ? 7000 : 4500));
+            }
+        }
+
+        function hideRecutToast() {
+            clearTimeout(recutToastHideTimer);
+            const el = document.getElementById('recut-toast');
+            if (el) el.className = 'recut-toast';
+        }
+
+        function setRecutExportBusy(busy) {
+            recutExportInProgress = !!busy;
+            updateSelectionUi();
+        }
+
+        function exportDownloadTimestampSuffix() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+
+        function exportDownloadFilename(baseName, kind) {
+            const name = (baseName || 'Recut').toString().trim() || 'Recut';
+            const dot = name.lastIndexOf('.');
+            const ext = dot > 0 ? name.slice(dot) : '';
+            let stem = dot > 0 ? name.slice(0, dot) : name;
+            stem = stem.replace(/-\d{14}$/, '');
+            stem = stem.replace(/(-Recut-\d+p)-\d{8}$/i, '$1');
+            if (kind === 'cv' && !/^CV-/i.test(stem)) stem = `CV-${stem}`;
+            if (kind === 'mozaik' && !/^Mozaik-/i.test(stem)) stem = `Mozaik-${stem}`;
+            const ts = exportDownloadTimestampSuffix();
+            return `${stem}-${ts}${ext}`;
+        }
+
+        function parseExportStamp(whenRaw) {
+            if (!whenRaw) return null;
+            let s = String(whenRaw).trim();
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(s)) {
+                s = `${s.replace(' ', 'T')}Z`;
+            }
+            const when = new Date(s);
+            return Number.isNaN(when.getTime()) ? null : when;
+        }
+
+        function uniqueExportFilename(baseName, kind) {
+            return exportDownloadFilename(baseName, kind);
+        }
+
+        function downloadBlob(blob, filename) {
+            if (!blob || blob.size === 0) {
+                throw new Error('Export file was empty — nothing to download.');
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'Recut-export';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 1000);
+        }
+
+        function matchedRecutIdsFromManifest(manifest) {
+            if (!manifest) return [];
+            if (Array.isArray(manifest.matched_recut_ids) && manifest.matched_recut_ids.length) {
+                return manifest.matched_recut_ids.map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id));
+            }
+            const fromParts = (manifest.matched_parts || [])
+                .map(p => parseInt(p.recut_id, 10))
+                .filter(id => !Number.isNaN(id));
+            return [...new Set(fromParts)];
+        }
+
+        async function markRecutsCvExported(recutIds, exportFilename) {
+            if (!recutIds || !recutIds.length) return null;
+            const body = { recut_ids: recutIds };
+            if (exportFilename) body.export_filename = exportFilename;
+            const res = await fetch('/api/recuts/mark-cv-recuts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) {
+                throw new Error(data.error || res.statusText);
+            }
+            return data;
+        }
+
+        function parseMatchedRecutIdsHeader(value) {
+            if (!value) return [];
+            return value.split(',').map(s => parseInt(s.trim(), 10)).filter(id => !Number.isNaN(id) && id > 0);
+        }
+
+        function clearRecutSelection() {
+            selectedRecutIds.clear();
+            document.querySelectorAll('#recuts-tbody .recut-row-checkbox').forEach(cb => { cb.checked = false; });
+            updateSelectionUi();
+        }
+
+        function applyRecutExportStamps(recutIds, kind, who, whenIso, filename) {
+            const ids = (recutIds || []).map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id) && id > 0);
+            if (ids.length) {
+                const when = whenIso || new Date().toISOString();
+                const idSet = new Set(ids);
+                recutsData.forEach(r => {
+                    const rid = parseInt(r.id, 10);
+                    if (!idSet.has(rid)) return;
+                    if (kind === 'cv') {
+                        r.desktop_sent_at = when;
+                        r.desktop_sent_by = who || r.desktop_sent_by || '';
+                        if (filename) r.desktop_sent_filename = filename;
+                    } else {
+                        r.mozaik_exported_at = when;
+                        r.mozaik_exported_by = who || r.mozaik_exported_by || '';
+                        if (filename) r.mozaik_exported_filename = filename;
+                    }
+                });
+                lastRecutsFingerprint = recutsDataFingerprint(recutsData);
+                ids.forEach(id => {
+                    const row = document.querySelector(`#recuts-tbody tr[data-recut-id="${id}"]`);
+                    if (!row) return;
+                    const rec = recutsData.find(r => parseInt(r.id, 10) === id);
+                    if (!rec) return;
+                    const col = kind === 'cv' ? 'cv' : 'mozaik';
+                    const cell = row.querySelector(`td[data-export-col="${col}"]`);
+                    if (cell) {
+                        cell.innerHTML = kind === 'cv' ? formatCvRecutsTag(rec) : formatMozaikExportedTag(rec);
+                    }
+                });
+            }
+            clearRecutSelection();
+        }
+
+        function clearRecutExportStampsLocal(recutIds) {
+            const ids = (recutIds || []).map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id) && id > 0);
+            if (!ids.length) return;
+            const idSet = new Set(ids);
+            recutsData.forEach(r => {
+                const rid = parseInt(r.id, 10);
+                if (!idSet.has(rid)) return;
+                r.desktop_sent_at = null;
+                r.desktop_sent_by = null;
+                r.desktop_sent_filename = null;
+                r.mozaik_exported_at = null;
+                r.mozaik_exported_by = null;
+                r.mozaik_exported_filename = null;
+            });
+            lastRecutsFingerprint = recutsDataFingerprint(recutsData);
+            ids.forEach(id => {
+                const row = document.querySelector(`#recuts-tbody tr[data-recut-id="${id}"]`);
+                if (!row) return;
+                const cvCell = row.querySelector('td[data-export-col="cv"]');
+                const mozCell = row.querySelector('td[data-export-col="mozaik"]');
+                if (cvCell) cvCell.textContent = '-';
+                if (mozCell) mozCell.textContent = '-';
+            });
+        }
+
+        async function clearSelectedExportStamps() {
+            if (!recutsIsAdmin) {
+                alert('Admin access required.');
+                return;
+            }
+            const ids = Array.from(selectedRecutIds);
+            if (!ids.length) {
+                alert('Select at least one recut.');
+                return;
+            }
+            if (!confirm(`Clear CV and Mozaik export stamps on ${ids.length} selected recut(s)?`)) return;
+            try {
+                const res = await fetch('/api/recuts/clear-export-stamps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids, kinds: ['cv', 'mozaik'] })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) {
+                    throw new Error(data.error || res.statusText);
+                }
+                clearRecutExportStampsLocal(ids);
+                clearRecutSelection();
+            } catch (e) {
+                alert(`Could not clear export stamps: ${e.message}`);
+            }
+        }
+
+        async function initRecutsAdminUi() {
+            try {
+                const res = await fetch('/api/whoami');
+                const data = await res.json();
+                recutsIsAdmin = data.role === 'admin' || !!data.is_super_admin;
+                const btn = document.getElementById('clear-export-stamps-btn');
+                if (btn && recutsIsAdmin) btn.style.display = '';
+            } catch (_) {}
+        }
+
+        function formatExportStampTag(r, opts) {
+            const whenRaw = r[opts.whenField];
+            if (!whenRaw) return '-';
+            const when = parseExportStamp(whenRaw);
+            const whenLabel = when ? when.toLocaleString() : String(whenRaw);
+            const who = (r[opts.whoField] || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const filename = (r[opts.filenameField] || '').toString().trim()
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const title = who ? `${opts.label} exported by ${who}` : `${opts.label} exported`;
+            let html = '';
+            if (filename) html += `<span class="export-tag-file">${filename}</span>`;
+            html += `<span class="export-tag-when">${whenLabel}</span>`;
+            if (who) html += `<span class="export-tag-who">${who}</span>`;
+            return `<span class="${opts.tagClass}" title="${title}">${html}</span>`;
+        }
+
+        function formatCvRecutsTag(r) {
+            return formatExportStampTag(r, {
+                whenField: 'desktop_sent_at',
+                whoField: 'desktop_sent_by',
+                filenameField: 'desktop_sent_filename',
+                tagClass: 'cv-recuts-tag',
+                label: 'CV'
+            });
+        }
+
+        function formatMozaikExportedTag(r) {
+            return formatExportStampTag(r, {
+                whenField: 'mozaik_exported_at',
+                whoField: 'mozaik_exported_by',
+                filenameField: 'mozaik_exported_filename',
+                tagClass: 'mozaik-export-tag',
+                label: 'Mozaik'
+            });
+        }
+
+        function getExportRecutIds(opts = {}) {
+            if (opts.recutIds && opts.recutIds.length) {
+                return opts.recutIds
+                    .map(id => parseInt(id, 10))
+                    .filter(id => !Number.isNaN(id) && id > 0);
+            }
+            return Array.from(selectedRecutIds)
+                .map(id => parseInt(id, 10))
+                .filter(id => !Number.isNaN(id) && id > 0);
+        }
+
+        async function buildPnxOnThisPc(opts = {}) {
+            const unified = !!opts.unified;
+            const ids = getExportRecutIds(opts);
+            if (!ids.length) {
+                if (!unified) showRecutToast('Select at least one recut.', { error: true });
+                return unified ? { ok: false, kind: 'cv', message: 'No recuts selected.' } : undefined;
+            }
+            if (!unified && recutExportInProgress) return;
+
+            const desktopApi = getDesktopApiBase();
+            if (!unified) {
+                setRecutExportBusy(true);
+                showRecutToast(`Processing ${ids.length} recut(s) for CV…`, { sticky: true, processing: true });
+            } else {
+                showRecutToast('Building CV .pnx…', { sticky: true, processing: true });
+            }
+
+            let manifest;
+            try {
+                showRecutToast('Building export manifest…', { sticky: true, processing: true });
+                const manifestRes = await fetch('/api/recuts/export-parts-list?delivery=manifest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids, format: 'pnx' })
+                });
+                if (!manifestRes.ok) {
+                    let msg = manifestRes.statusText;
+                    try {
+                        const err = await manifestRes.json();
+                        if (err && err.error) msg = err.error;
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+                manifest = await manifestRes.json();
+            } catch (e) {
+                const msg = `Could not build manifest: ${e.message}`;
+                if (!unified) showRecutToast(msg, { error: true });
+                if (!unified) setRecutExportBusy(false);
+                return unified ? { ok: false, kind: 'cv', message: msg } : undefined;
+            }
+
+            const pnxInsideName = exportDownloadFilename(manifest.suggested_filename || 'Recut.pnx', 'cv');
+            const form = new FormData();
+            form.append('manifest', JSON.stringify(manifest));
+            form.append('output_name', pnxInsideName);
+            form.append('download_as', 'zip');
+
+            const snxFetch = manifest.snx_fetch || {};
+            const cvImport = manifest.cv_import || {};
+            const snxName = cvImport.source_filename || 'job.snx';
+            if (snxFetch.url) {
+                try {
+                    showRecutToast('Fetching job SNX…', { sticky: true, processing: true });
+                    const snxRes = await fetch(snxFetch.url, { credentials: 'include' });
+                    if (snxRes.ok) {
+                        const snxBlob = await snxRes.blob();
+                        if (snxBlob && snxBlob.size > 0) {
+                            form.append('snx', snxBlob, snxName);
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            try {
+                showRecutToast('Building CV PNX on this PC…', { sticky: true, processing: true });
+                const buildRes = await fetch(`${desktopApi}/api/production/recut-pnx/build`, {
+                    method: 'POST',
+                    body: form
+                });
+                if (!buildRes.ok) {
+                    let msg = buildRes.statusText;
+                    let needsSnx = false;
+                    try {
+                        const err = await buildRes.json();
+                        if (err && err.error) msg = err.error;
+                        needsSnx = Boolean(err && err.needs_snx);
+                        if (buildRes.status === 403 && err && err.expected_shop_id != null) {
+                            msg += ' (agent expects v2 shop #' + err.expected_shop_id;
+                            if (err.received_shop_id != null) msg += ', manifest is shop #' + err.received_shop_id;
+                            msg += ')';
+                        }
+                    } catch (_) {}
+                    if (needsSnx) {
+                        msg += ' SNX was not cached locally — ensure v2 SNX download works or copy SNX to the import cache.';
+                    }
+                    throw new Error(msg);
+                }
+                const blob = await buildRes.blob();
+                const cd = buildRes.headers.get('Content-Disposition') || '';
+                const downloadIsZip = (buildRes.headers.get('X-Innosaw-Download-Format') || '').toLowerCase() === 'zip'
+                    || (cd && /\.zip/i.test(cd));
+                let filename = pnxInsideName.replace(/\.pnx$/i, '.zip');
+                const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                if (m && m[1]) {
+                    filename = decodeURIComponent(m[1].replace(/"/g, ''));
+                } else if (!downloadIsZip) {
+                    filename = pnxInsideName;
+                }
+                downloadBlob(blob, filename);
+                const pnxInside = buildRes.headers.get('X-Innosaw-Pnx-Filename') || pnxInsideName;
+                const matched = buildRes.headers.get('X-Innosaw-Matched-Parts');
+                const unresolved = buildRes.headers.get('X-Innosaw-Unresolved-Count');
+                const partCount = matched ? parseInt(matched, 10) : ids.length;
+                let msg = downloadIsZip
+                    ? `Exported ${partCount} part(s) to CV. Downloaded ${filename} (contains ${pnxInside}).`
+                    : `Exported ${partCount} part(s) to CV. Downloaded ${filename}.`;
+                if (unresolved && parseInt(unresolved, 10) > 0) {
+                    msg += ` ${unresolved} could not be matched.`;
+                }
+                if (!unified) showRecutToast(msg, { success: true, duration: 6000 });
+                try {
+                    const matchedRecutIds = matchedRecutIdsFromManifest(manifest);
+                    const stampIds = matchedRecutIds.length ? matchedRecutIds : ids;
+                    const markResult = await markRecutsCvExported(stampIds, filename);
+                    applyRecutExportStamps(
+                        stampIds,
+                        'cv',
+                        markResult && markResult.sent_by,
+                        markResult && markResult.exported_at,
+                        filename
+                    );
+                } catch (markErr) {
+                    console.warn('Could not record CV Recuts export timestamp:', markErr);
+                    clearRecutSelection();
+                }
+                return unified ? { ok: true, kind: 'cv', message: msg } : undefined;
+            } catch (e) {
+                const msg = `Could not export to CV (${desktopApi}): ${e.message}`;
+                if (!unified) showRecutToast(msg, { error: true, duration: 8000 });
+                return unified ? { ok: false, kind: 'cv', message: msg } : undefined;
+            } finally {
+                if (!unified) setRecutExportBusy(false);
+            }
+        }
+
+        async function exportSelectedRecuts() {
+            const ids = getExportRecutIds();
+            if (!ids.length) {
+                showRecutToast('Select at least one recut.', { error: true });
+                return;
+            }
+            if (recutExportInProgress) return;
+            if (!confirm(`Export ${ids.length} recut(s)? CV jobs export as .pnx, Mozaik jobs as .xml/.zip.`)) return;
+
+            setRecutExportBusy(true);
+            showRecutToast(`Processing ${ids.length} recut(s)…`, { sticky: true, processing: true });
+
+            const outcomes = [];
+            try {
+                const planRes = await fetch('/api/recuts/export-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids })
+                });
+                const plan = await planRes.json().catch(() => ({}));
+                if (!planRes.ok || plan.error) {
+                    throw new Error(plan.error || planRes.statusText);
+                }
+
+                const mozaikIds = plan.mozaik_recut_ids || [];
+                const cvIds = plan.cv_recut_ids || [];
+
+                if (mozaikIds.length) {
+                    const moz = await exportPartsList('mozaik_xml', { unified: true, recutIds: mozaikIds });
+                    if (moz) outcomes.push(moz);
+                }
+                if (cvIds.length) {
+                    const cv = await buildPnxOnThisPc({ unified: true, recutIds: cvIds });
+                    if (cv) outcomes.push(cv);
+                }
+
+                const ok = outcomes.filter(o => o.ok);
+                const failed = outcomes.filter(o => !o.ok);
+                const unresolved = plan.unresolved_count || 0;
+                if (ok.length && !failed.length && !unresolved) {
+                    showRecutToast(ok.map(o => o.message).join(' '), { success: true, duration: 8000 });
+                } else if (ok.length) {
+                    let msg = ok.map(o => o.message).join(' ');
+                    if (failed.length) msg += ` ${failed.map(o => o.message).join(' ')}`;
+                    if (unresolved) msg += ` ${unresolved} recut(s) could not be matched.`;
+                    showRecutToast(msg, failed.length ? { error: true, duration: 10000 } : { success: true, duration: 9000 });
+                } else if (failed.length) {
+                    showRecutToast(failed.map(o => o.message).join(' '), { error: true, duration: 10000 });
+                } else if (unresolved) {
+                    const reason = (plan.unresolved && plan.unresolved[0] && plan.unresolved[0].reason)
+                        ? plan.unresolved[0].reason
+                        : `${unresolved} recut(s) could not be matched.`;
+                    showRecutToast(reason, { error: true, duration: 10000 });
+                } else {
+                    showRecutToast('No export files were generated for this selection.', { error: true });
+                }
+            } catch (e) {
+                showRecutToast(`Export failed: ${e.message}`, { error: true, duration: 10000 });
+            } finally {
+                setRecutExportBusy(false);
+            }
+        }
+
+        async function sendRecutsToDesktop() {
+            const ids = Array.from(selectedRecutIds);
+            if (!ids.length) {
+                alert('Select at least one recut.');
+                return;
+            }
+            if (!confirm(`Send ${ids.length} recut(s) to Innosaw Desktop on this PC?`)) return;
+
+            const desktopApi = getDesktopApiBase();
+            let manifest;
+            try {
+                const manifestRes = await fetch('/api/recuts/export-parts-list?delivery=manifest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids, format: 'pnx' })
+                });
+                if (!manifestRes.ok) {
+                    let msg = manifestRes.statusText;
+                    try {
+                        const err = await manifestRes.json();
+                        if (err && err.error) msg = err.error;
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+                manifest = await manifestRes.json();
+            } catch (e) {
+                alert(`Could not build manifest: ${e.message}`);
+                return;
+            }
+
+            try {
+                const form = new FormData();
+                form.append('manifest', JSON.stringify(manifest));
+                form.append('source', 'v2.innosaw.work');
+
+                const snxFetch = manifest.snx_fetch || {};
+                const cvImport = manifest.cv_import || {};
+                const snxName = cvImport.source_filename || 'job.snx';
+                if (snxFetch.url) {
+                    const snxRes = await fetch(snxFetch.url, { credentials: 'include' });
+                    if (snxRes.ok) {
+                        const snxBlob = await snxRes.blob();
+                        if (snxBlob && snxBlob.size > 0) {
+                            form.append('snx', snxBlob, snxName);
+                        }
+                    }
+                }
+
+                const inboxRes = await fetch(`${desktopApi}/api/production/recut-pnx/inbox`, {
+                    method: 'POST',
+                    body: form
+                });
+                if (!inboxRes.ok) {
+                    let msg = inboxRes.statusText;
+                    try {
+                        const err = await inboxRes.json();
+                        if (err && err.error) msg = err.error;
+                        if (inboxRes.status === 403 && err && err.expected_shop_id != null) {
+                            msg += ' (desktop expects v2 shop #' + err.expected_shop_id;
+                            if (err.received_shop_id != null) msg += ', manifest is shop #' + err.received_shop_id;
+                            msg += ')';
+                        }
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+                const inboxPayload = await inboxRes.json();
+                const entry = inboxPayload.entry || {};
+                const label = entry.label || manifest.label || 'Recut job';
+                const snxNote = inboxPayload.snx_cached
+                    ? 'SNX cached on this PC.'
+                    : (inboxPayload.snx_fetch_error
+                        ? 'SNX not cached yet — open Innosaw Desktop → Recuts and click Pull SNX from v2.'
+                        : 'Check SNX status in the Recuts tab.');
+                alert(
+                    'Sent to Innosaw Desktop: ' + label + '\\n\\n' +
+                    snxNote + '\\n\\n' +
+                    'Switch to the Innosaw Desktop app → Recuts tab, then Build PNX.'
+                );
+                try {
+                    await fetch('/api/recuts/mark-desktop-sent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ recut_ids: ids })
+                    });
+                    await loadRecuts();
+                } catch (_) {}
+            } catch (e) {
+                alert(
+                    'Could not reach Innosaw Desktop API at ' + desktopApi + '.\\n\\n' +
+                    e.message + '\\n\\n' +
+                    'On the CV PC run server/api (port 4000) with INNOSAW_QR_SCANNER_ROOT set, then try again.'
+                );
+            }
+        }
+
+        function formatUnresolvedExportMsg(matched, unresolvedCount, summary) {
+            let msg = `${matched || '?'} part(s) exported; ${unresolvedCount} recut(s) could not be matched.`;
+            if (summary) {
+                msg += `\n\nNot matched:\n${summary.replace(/; /g, '\n')}`;
+            }
+            msg += '\n\nCheck rows with no Exported stamp — re-scan the part label or verify Labels import (job, run, material, part #).';
+            return msg;
+        }
+
+        async function exportPartsList(format, opts = {}) {
+            const unified = !!opts.unified;
+            const ids = getExportRecutIds(opts);
+            if (!ids.length) {
+                if (!unified) showRecutToast('Select at least one recut.', { error: true });
+                return unified ? { ok: false, kind: 'mozaik', message: 'No recuts selected.' } : undefined;
+            }
+            if (!unified && recutExportInProgress) return;
+            const label = format === 'pnx' ? 'CV Recuts' : 'Mozaik Recuts';
+            if (!unified && !confirm(`Export ${ids.length} recut(s) to ${label}?`)) return;
+
+            if (!unified) {
+                setRecutExportBusy(true);
+                showRecutToast(`Processing ${ids.length} recut(s) for Mozaik…`, { sticky: true, processing: true });
+            } else {
+                showRecutToast('Building Mozaik export…', { sticky: true, processing: true });
+            }
+            try {
+                const res = await fetch('/api/recuts/export-parts-list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids, format })
+                });
+                if (!res.ok) {
+                    let msg = res.statusText;
+                    try {
+                        const err = await res.json();
+                        if (err && err.error) msg = err.error;
+                    } catch (_) {}
+                    throw new Error(msg);
+                }
+                showRecutToast('Downloading Mozaik export…', { sticky: true, processing: true });
+                const blob = await res.blob();
+                const cd = res.headers.get('Content-Disposition') || '';
+                let filename = format === 'pnx' ? 'Recut.pnx' : 'Recut.MozaikParts.xml';
+                const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                if (m && m[1]) filename = decodeURIComponent(m[1].replace(/"/g, ''));
+                filename = exportDownloadFilename(filename, 'mozaik');
+                downloadBlob(blob, filename);
+                const matched = res.headers.get('X-Innosaw-Matched-Parts');
+                const unresolved = res.headers.get('X-Innosaw-Unresolved-Count');
+                const unresolvedSummary = res.headers.get('X-Innosaw-Unresolved-Summary') || '';
+                const materialCount = res.headers.get('X-Innosaw-Material-Count');
+                const cvFix = res.headers.get('X-Innosaw-Cv-Pnx-Fix');
+                let resultMsg = '';
+                if (format === 'pnx' && cvFix === 'windows-required') {
+                    resultMsg = `Downloaded ${filename}. Run fix_recut_pnx_for_cv.py before CV import.`;
+                    if (!unified) showRecutToast(resultMsg, { success: true, duration: 8000 });
+                } else if (format === 'mozaik_xml' && materialCount && parseInt(materialCount, 10) > 1) {
+                    resultMsg = `Downloaded ${filename} (${materialCount} XML files in zip).`;
+                    if (unresolved && parseInt(unresolved, 10) > 0) {
+                        resultMsg += ` ${unresolved} recut(s) could not be matched.`;
+                    }
+                    if (!unified) showRecutToast(resultMsg, { success: true, duration: 7000 });
+                } else if (unresolved && parseInt(unresolved, 10) > 0) {
+                    resultMsg = formatUnresolvedExportMsg(matched, unresolved, unresolvedSummary);
+                    if (!unified) showRecutToast(resultMsg, { error: true, duration: 9000 });
+                } else {
+                    resultMsg = `Downloaded ${filename}.`;
+                    if (!unified) showRecutToast(resultMsg, { success: true, duration: 5000 });
+                }
+                if (format === 'mozaik_xml' || format === 'mozaik') {
+                    const matchedIds = parseMatchedRecutIdsHeader(res.headers.get('X-Innosaw-Matched-Recut-Ids'));
+                    const exportedFilename = res.headers.get('X-Innosaw-Exported-Filename') || filename;
+                    applyRecutExportStamps(
+                        matchedIds.length ? matchedIds : ids,
+                        'mozaik',
+                        res.headers.get('X-Innosaw-Exported-By') || '',
+                        res.headers.get('X-Innosaw-Exported-At') || '',
+                        exportedFilename
+                    );
+                }
+                const hadError = unresolved && parseInt(unresolved, 10) > 0;
+                return unified ? {
+                    ok: !hadError,
+                    kind: 'mozaik',
+                    message: resultMsg || `Downloaded ${filename}.`
+                } : undefined;
+            } catch (e) {
+                const msg = `Mozaik export failed: ${e.message}`;
+                if (!unified) showRecutToast(`Export failed: ${e.message}`, { error: true, duration: 8000 });
+                return unified ? { ok: false, kind: 'mozaik', message: msg } : undefined;
+            } finally {
+                if (!unified) setRecutExportBusy(false);
+            }
+        }
+
+        function escCell(value) {
+            return (value || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function formatCabinetCell(r) {
+            return escCell(r.cabinet_name || '-');
+        }
+
+        function formatCabinetNumberCell(r) {
+            const scan = (r.scan_cabinet_number || r.cabinet_assembly || '').toString().trim();
+            const matched = (r.matched_cabinet_number || '').toString().trim();
+            const debug = (r.match_debug || '').toString().trim();
+            let html = escCell(scan || matched || '-');
+            if (scan && matched && scan.toLowerCase() !== matched.toLowerCase()) {
+                html = `${escCell(scan)}<span class="cell-sub export-hint">Export → ${escCell(matched)}</span>`;
+            }
+            if (debug) {
+                html += `<span class="cell-sub export-hint" title="${escCell(debug)}">Debug</span>`;
+            }
+            return html;
+        }
+
+        function formatPartCell(r) {
+            const scan = (r.part_name || '').toString().trim();
+            const matchedNo = (r.matched_part_no || '').toString().trim();
+            const matchedName = (r.matched_part_name || '').toString().trim();
+            const matched = matchedNo && matchedName
+                ? `${matchedNo} - ${matchedName}`
+                : (matchedName || matchedNo);
+            if (scan && matched) {
+                const scanKey = scan.replace(/\s/g, '').toLowerCase();
+                const matchKey = matched.replace(/\s/g, '').toLowerCase();
+                if (scanKey !== matchKey) {
+                    return `${escCell(scan)}<span class="cell-sub export-hint">Export → ${escCell(matched)}</span>`;
+                }
+            }
+            return escCell(scan || matched || '-');
+        }
+
+        function formatMaterialCell(r) {
+            const scanParts = [r.material, r.material_thickness].map(v => (v || '').toString().trim()).filter(Boolean);
+            const scan = scanParts.join(' · ');
+            const matchParts = [r.matched_material, r.matched_material_thickness].map(v => (v || '').toString().trim()).filter(Boolean);
+            const matched = matchParts.join(' · ');
+            if (scan && matched && scan.toLowerCase() !== matched.toLowerCase()) {
+                return `${escCell(scan)}<span class="cell-sub export-hint">Export → ${escCell(matched)}</span>`;
+            }
+            return escCell(scan || matched || '-');
+        }
+
+        function formatRunCell(r) {
+            const scan = (r.run_name || '').toString().trim();
+            const matched = (r.matched_run_name || '').toString().trim();
+            if (scan && matched && scan.toLowerCase() !== matched.toLowerCase()) {
+                return `${escCell(scan)}<span class="cell-sub export-hint">Export → ${escCell(matched)}</span>`;
+            }
+            return escCell(scan || matched || '-');
+        }
+
+        function formatSizeLabel(length, width) {
+            const l = (length || '').toString().trim();
+            const w = (width || '').toString().trim();
+            if (l && w) return `${l} × ${w}`;
+            return l || w || '';
+        }
+
+        function formatSizeCell(r) {
+            const scan = formatSizeLabel(r.part_length, r.part_width);
+            const matched = formatSizeLabel(r.matched_part_length, r.matched_part_width);
+            if (scan && matched && scan.replace(/\s/g, '') !== matched.replace(/\s/g, '')) {
+                return `${escCell(scan)}<span class="cell-sub export-hint">Export → ${escCell(matched)}</span>`;
+            }
+            return escCell(scan || matched || '-');
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('recuts-tbody');
+            tbody.innerHTML = recutsData.map(r => {
+                const dt = new Date(r.timestamp);
+                const photoUrl = r.photo_url ? r.photo_url : (r.photo_path ? `/api/${r.photo_path}` : null);
+                const photoCell = photoUrl ? `<a href="${photoUrl}" target="_blank" rel="noopener"><img class="thumb" src="${photoUrl}" alt="photo"></a>` : '-';
+                const notes = (r.notes || '').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const done = !!r.recut_completed;
+                const completedAt = r.completed_at ? new Date(r.completed_at).toLocaleString() : '-';
+                const completedBy = (r.completed_by || '-').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const checked = selectedRecutIds.has(r.id) ? 'checked' : '';
+                return `
+                    <tr data-recut-id="${r.id}">
+                        <td class="recut-select-col"><label class="recut-checkbox-hit"><input type="checkbox" class="recut-row-checkbox" ${checked} onchange="toggleRecutSelection(${r.id}, this.checked)"></label></td>
+                        <td>${dt.toLocaleString()}</td>
+                        <td><strong>${r.machine || '-'}</strong></td>
+                        <td>${(r.request_type || 'recut').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td>${(r.fix_station || '-').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td>${(r.job_name || '').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td>${formatCabinetCell(r)}</td>
+                        <td class="nowrap">${formatCabinetNumberCell(r)}</td>
+                        <td class="nowrap">${formatPartCell(r)}</td>
+                        <td class="nowrap">${formatMaterialCell(r)}</td>
+                        <td>${formatRunCell(r)}</td>
+                        <td class="nowrap">${formatSizeCell(r)}</td>
+                        <td>${escCell(r.gcode)}</td>
+                        <td>${(r.operator_id || '-').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td>${(r.caused_by || '-').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td>${(r.reason || '-').toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+                        <td data-export-col="cv">${formatCvRecutsTag(r)}</td>
+                        <td data-export-col="mozaik">${formatMozaikExportedTag(r)}</td>
+                        <td>${photoCell}</td>
+                        <td><input type="checkbox" ${done ? 'checked' : ''} onchange="toggleRecutComplete(${r.id}, this.checked)"></td>
+                        <td>${completedAt}</td>
+                        <td>${completedBy}</td>
+                        <td><button class="btn btn-danger" onclick="deleteRecut(${r.id})">Delete</button></td>
+                        <td>${notes || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+            updateSelectionUi();
+        }
+
+        async function deleteRecut(id) {
+            if (!confirm('Delete this recut entry?')) return;
+            try {
+                const res = await fetch(`/api/recuts/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                selectedRecutIds.delete(id);
+                lastRecutsFingerprint = '';
+                await loadRecuts({ force: true });
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+
+        async function deleteSelectedRecuts() {
+            const ids = Array.from(selectedRecutIds);
+            if (!ids.length) {
+                alert('Select at least one recut.');
+                return;
+            }
+            if (!confirm(`Delete ${ids.length} selected recut(s)?`)) return;
+            try {
+                const res = await fetch('/api/recuts/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_ids: ids })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                ids.forEach(id => selectedRecutIds.delete(id));
+                lastRecutsFingerprint = '';
+                await loadRecuts({ force: true });
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+
+        async function completeSelectedRecuts(markComplete) {
+            const ids = Array.from(selectedRecutIds);
+            if (!ids.length) {
+                alert('Select at least one recut.');
+                return;
+            }
+            let completed_by = null;
+            if (markComplete) {
+                const remembered = localStorage.getItem('recut_completed_by') || '';
+                completed_by = prompt(`Completed by (initials) for ${ids.length} recut(s):`, remembered) || '';
+                completed_by = completed_by.trim();
+                if (!completed_by) {
+                    alert('Completed by is required.');
+                    return;
+                }
+                localStorage.setItem('recut_completed_by', completed_by);
+            } else if (!confirm(`Reopen ${ids.length} selected recut(s)?`)) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/recuts/bulk-complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recut_ids: ids,
+                        recut_completed: !!markComplete,
+                        completed_by
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                lastRecutsFingerprint = '';
+                await loadRecuts({ force: true });
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+
+        async function toggleRecutComplete(id, checked) {
+            try {
+                let completed_by = null;
+                if (checked) {
+                    const remembered = localStorage.getItem('recut_completed_by') || '';
+                    completed_by = prompt('Completed by (initials):', remembered) || '';
+                    completed_by = completed_by.trim();
+                    if (!completed_by) {
+                        alert('Completed by is required.');
+                        await loadRecuts({ force: true });
+                        return;
+                    }
+                    localStorage.setItem('recut_completed_by', completed_by);
+                } else {
+                    if (!confirm('Mark this recut as NOT completed (reopen)?')) {
+                        await loadRecuts({ force: true });
+                        return;
+                    }
+                }
+                const res = await fetch(`/api/recuts/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recut_completed: !!checked, completed_by })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                lastRecutsFingerprint = '';
+                await loadRecuts({ force: true });
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+                await loadRecuts({ force: true });
+            }
+        }
+
+        async function submitRecut() {
+            const err = document.getElementById('add-error');
+            err.style.display = 'none';
+            err.textContent = '';
+
+            const machine = document.getElementById('add-machine').value;
+            if (!machine) { err.textContent = 'Machine is required.'; err.style.display = 'block'; return; }
+
+            const fd = new FormData();
+            fd.append('machine', machine);
+            const type = document.getElementById('add-type').value;
+            const fixStation = document.getElementById('add-fix-station').value;
+            if (type) fd.append('request_type', type);
+            if (fixStation) fd.append('fix_station', fixStation);
+            const op = document.getElementById('add-operator').value;
+            const causedBy = document.getElementById('add-caused-by').value;
+            const job = document.getElementById('add-job').value;
+            const cab = document.getElementById('add-cabinet').value;
+            const part = document.getElementById('add-part').value;
+            const gcode = document.getElementById('add-gcode').value;
+            const reason = document.getElementById('add-reason').value;
+            const notes = document.getElementById('add-notes').value;
+            const photo = document.getElementById('add-photo').files[0];
+
+            if (op) fd.append('operator_id', op);
+            if (causedBy) fd.append('caused_by', causedBy);
+            if (job) fd.append('job_name', job);
+            if (cab) fd.append('cabinet_name', cab);
+            if (part) fd.append('part_name', part);
+            if (gcode) fd.append('gcode', gcode);
+            if (reason) fd.append('reason', reason);
+            if (notes) fd.append('notes', notes);
+            if (photo) fd.append('photo', photo);
+            
+            const assignedUserEl = document.getElementById('add-assigned-user');
+            const assignedStationEl = document.getElementById('add-assigned-station');
+            const assignedUser = assignedUserEl ? assignedUserEl.value : '';
+            const assignedStation = assignedStationEl ? assignedStationEl.value : '';
+            if (assignedUser) {
+                fd.append('assigned_user_id', assignedUser);
+                console.log('Sending recut with assigned_user_id:', assignedUser);
+            }
+            if (assignedStation) {
+                fd.append('assigned_station_id', assignedStation);
+                console.log('Sending recut with assigned_station_id:', assignedStation);
+            }
+
+            try {
+                const res = await fetch('/api/recuts', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                closeAddModal();
+                await loadRecuts();
+            } catch (e) {
+                err.textContent = `Error: ${e.message}`;
+                err.style.display = 'block';
+            }
+        }
+
+        // Phone camera QR scan (Html5Qrcode)
+        async function startQrScan() {
+            const area = document.getElementById('scan-area');
+            const last = document.getElementById('qr-last');
+            last.textContent = '—';
+
+            if (!window.isSecureContext) {
+                alert('Camera requires HTTPS (or localhost). You are on an insecure address, so the browser blocks camera access. Use Paste QR Text or a scanner.');
+                return;
+            }
+            if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
+                alert('Camera not available in this browser. Use Paste QR Text or a scanner.');
+                return;
+            }
+            if (typeof Html5Qrcode === 'undefined') {
+                alert('Scanner library not loaded. Please refresh.');
+                return;
+            }
+
+            try {
+                await stopQrScan();
+                area.style.display = 'block';
+                const stopBtn = document.getElementById('camera_stop_btn');
+                if (stopBtn) stopBtn.style.display = 'block';
+                detector = new Html5Qrcode("reader");
+                
+                await detector.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 }
+                    },
+                    (decodedText) => {
+                        if (decodedText) {
+                            last.textContent = decodedText;
+                            applyPartLabel(decodedText);
+                            stopQrScan();
+                            // Optional: provide feedback
+                            if (typeof beep === 'function') beep(true);
+                        }
+                    },
+                    (errorMessage) => {
+                        // ignore scan errors
+                    }
+                );
+            } catch (e) {
+                alert(`Camera error: ${e.message || e}`);
+                area.style.display = 'none';
+                const stopBtn = document.getElementById('camera_stop_btn');
+                if (stopBtn) stopBtn.style.display = 'none';
+            }
+        }
+
+        async function stopQrScan() {
+            const area = document.getElementById('scan-area');
+            const stopBtn = document.getElementById('camera_stop_btn');
+            if (stopBtn) stopBtn.style.display = 'none';
+            if (detector) {
+                try {
+                    await detector.stop();
+                    detector = null;
+                } catch (e) {
+                    console.error("Error stopping detector", e);
+                }
+            }
+            area.style.display = 'none';
+        }
+
+        function applyPartLabel(raw) {
+            let txt = String(raw || '').trim();
+            if (txt.startsWith('QR:')) {
+                txt = txt.substring(3).trim();
+            }
+
+            // Handle pipe-separated format: gcode|job|run_number|material|part_no
+            if (txt.includes('|')) {
+                const parts = txt.split('|').map(s => s.trim());
+                if (parts.length >= 2) {
+                    document.getElementById('add-gcode').value = parts[0] || '';
+                    document.getElementById('add-job').value = parts[1] || '';
+                    if (parts.length >= 5) {
+                        document.getElementById('add-part').value = parts[4] || '';
+                    }
+                    return;
+                }
+            }
+
+            // Handle comma-separated format: gcode, part_num, job, cab_name, cab_assembly, part_name, material, run_name, opening
+            const parts = txt.split(',').map(s => s.trim());
+            if (parts.length >= 6) {
+                document.getElementById('add-gcode').value = parts[0] || '';
+                document.getElementById('add-job').value = parts[2] || '';
+                document.getElementById('add-cabinet').value = (parts[3] || '') + ' ' + (parts[4] || '');
+                document.getElementById('add-part').value = parts[5] || '';
+                return;
+            }
+
+            // Handle LP:{id} format
+            if (txt.startsWith('LP:')) {
+                const id = txt.split(':')[1];
+                document.getElementById('add-raw').value = txt; // keep it there
+                return;
+            }
+        }
+
+        function parsePastedQr() {
+            const raw = (document.getElementById('add-raw').value || '').trim();
+            if (!raw) return;
+            applyPartLabel(raw);
+            document.getElementById('qr-last').textContent = raw;
+        }
+
+        fixExternalLinks();
+        
+        // Searchable job dropdown
+        let _recutsJobSelect = null;
+        async function loadRecutsJobs() {
+            try {
+                const res = await fetch('/api/reports/jobs?window=all&limit=200');
+                const data = await res.json().catch(() => ({}));
+                const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+                
+                if (!_recutsJobSelect) {
+                    _recutsJobSelect = initSearchableSelect({
+                        inputId: 'job-filter-input',
+                        hiddenId: 'job-filter',
+                        dropdownId: 'job-filter-dropdown',
+                        options: ['', ...jobs],
+                        placeholder: 'Type to filter jobs...',
+                        emptyLabel: '(All Jobs)',
+                        onChange: () => {}
+                    });
+                } else {
+                    _recutsJobSelect.setOptions(['', ...jobs]);
+                }
+            } catch (e) {
+                console.error('Failed to load jobs:', e);
+            }
+        }
+        loadRecutsJobs();
+        initRecutsAdminUi();
+
+        const selectAllEl = document.getElementById('select-all-recuts');
+        if (selectAllEl) {
+            selectAllEl.addEventListener('change', (e) => toggleSelectAll(e.target.checked));
+        }
+        
+        loadRecuts();
+        startRecutsAutoRefresh();
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) scheduleRecutsRefresh();
+        });
+    </script>
+    <script src="/static/searchable-select.js?v=20260116"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,81 @@
+/* Searchable Select Dropdown Component */
+.searchable-select-wrap {
+    position: relative;
+    width: 100%;
+}
+.searchable-select-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background:var(--card-bg, #1e1e1e);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+.searchable-select-input:focus {
+    outline: none;
+    border-color: #0d2137;
+}
+.searchable-select-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background:var(--card-bg, #1e1e1e);
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 5px 5px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.searchable-select-dropdown.open {
+    display: block;
+}
+.searchable-select-option {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+.searchable-select-option:hover, .searchable-select-option.highlighted {
+    background: #f5f8fa;
+}
+.searchable-select-option.selected {
+    background: #e3f2fd;
+    font-weight: 700;
+}
+.searchable-select-empty {
+    padding: 10px 12px;
+    color: #999;
+    font-style: italic;
+}
+
+/* Dark theme variant for nesting nav */
+.searchable-select-dark .searchable-select-input {
+    background: #1e3a5f;
+    color: white;
+    border: none;
+}
+.searchable-select-dark .searchable-select-input::placeholder {
+    color: rgba(255,255,255,0.6);
+}
+.searchable-select-dropdown-dark {
+    background: #1e3a5f;
+    border: 1px solid #334155;
+}
+.searchable-select-dropdown-dark .searchable-select-option {
+    color: white;
+    border-bottom-color: #334155;
+}
+.searchable-select-dropdown-dark .searchable-select-option:hover,
+.searchable-select-dropdown-dark .searchable-select-option.highlighted {
+    background: #2d4a6f;
+}
+.searchable-select-dropdown-dark .searchable-select-option.selected {
+    background: #3b5998;
+}
+.searchable-select-dropdown-dark .searchable-select-empty {
+    color: rgba(255,255,255,0.5);
+}

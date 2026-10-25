@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help - Innosaw</title>
+    <link rel="stylesheet" href="/static/common.css?v=20260408c">
+    <script src="/static/theme.js?v=20260416a"></script>
+    <style>
+        .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+        .help-grid .card p { color: var(--text-primary); line-height: 1.45; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+        .link-list { margin-top: 10px; display: grid; gap: 8px; }
+        .link-list a { color: var(--link-color); text-decoration: none; font-weight: 800; }
+        .link-list a:hover { text-decoration: underline; }
+        .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:var(--bg-tertiary); color:var(--text-primary); font-size:12px; font-weight:800; border:1px solid var(--border-color); }
+        .help-copy { color: var(--text-secondary); }
+        .help-list { margin-left:20px; color:var(--text-primary); font-size:14px; margin-top:5px; line-height:1.6; }
+        .help-note { margin-top:15px; padding:10px; background:var(--table-warning-bg); border-radius:6px; font-size:13px; color:var(--table-warning-text); border:1px solid color-mix(in srgb, var(--table-warning-bg) 70%, var(--border-color) 30%); }
+        .help-divider { margin-top:15px; border-top:1px solid var(--border-color); padding-top:10px; }
+        .help-img-container { margin-top:15px; display:flex; gap:10px; flex-wrap:wrap; align-items: flex-start; }
+        .help-img-wrap { cursor: zoom-in; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: block; text-decoration: none; }
+        .help-img-wrap:hover { border-color: var(--link-color); box-shadow: 0 4px 12px var(--card-shadow); }
+        .help-img { max-width: 300px; width: 100%; height: auto; display: block; object-fit: contain; }
+
+        /* Modal Styles */
+        .help-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; }
+        .help-modal-content { max-width: 90%; max-height: 85%; object-fit: contain; border: 3px solid white; border-radius: 8px; }
+        .help-modal-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; user-select: none; }
+        .help-modal-prev, .help-modal-next { position: absolute; top: 50%; width: auto; padding: 16px; margin-top: -50px; color: white; font-weight: bold; font-size: 50px; transition: 0.6s ease; border-radius: 0 3px 3px 0; user-select: none; cursor: pointer; text-decoration: none; }
+        .help-modal-next { right: 0; border-radius: 3px 0 0 3px; }
+        .help-modal-prev { left: 0; }
+        .help-modal-prev:hover, .help-modal-next:hover { background-color: rgba(255,255,255,0.2); }
+        .help-modal-caption { margin-top: 15px; color: white; font-size: 18px; text-align: center; font-weight: 800; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>❓ Help</h1>
+        <div class="subtitle">Quick links and troubleshooting for your shop dashboard</div>
+        <div class="nav_primary">
+            <a class="nav_btn" href="/">Dashboard</a>
+            <a class="nav_btn" href="/reports">Reports</a>
+            <a id="shop_link" class="nav_btn" href="/">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/admin">Admin</a>
+            <a class="nav_btn active" href="/help">Help</a>
+            <a class="nav_btn ext-link" data-port="5000" data-path="/" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <a class="nav_btn" href="/login">Login</a>
+        </div>
+    </div>
+    <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/mobile">Mobile Scan</a>
+        <a class="nav_btn" href="/maintenance">Maintenance</a>
+        <a class="nav_btn" href="/inventory">Inventory</a>
+        <a class="nav_btn" href="/tools">Tools</a>
+        <a class="nav_btn" href="/recuts">Recuts</a>
+    </div>
+
+    <div class="container">
+        <div class="help-grid">
+            <div class="card">
+                <h2>Common Pages</h2>
+                <div class="link-list">
+                    <a href="/reports">Reports</a>
+                    <a href="/scans">Scan Log</a>
+                    <a href="/inventory">Inventory</a>
+                    <a href="/tools">Tools / Tooling Layout</a>
+                    <a href="/maintenance">Maintenance</a>
+                    <a href="/recuts">Recuts</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Bins (Online vs Local)</h2>
+                <p>
+                    If you’re on the public URL (<span class="pill">qr.&lt;domain&gt;</span>), the Bin Manager usually lives at
+                    <span class="pill">bins.&lt;domain&gt;</span>. If you’re on the LAN (no ports), bins usually live under <span class="pill">/bins</span>.
+                    This UI auto-adjusts the Bins link.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Login / Permissions</h2>
+                <p>
+                    Some actions require <span class="pill">shop</span> or <span class="pill">admin</span>.
+                    Use <a href="/login">/login</a> to authenticate when prompted.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Barcode Mapping (Operators + Stations)</h2>
+                <p>
+                    <strong>Operator badges:</strong> Go to <a href="/admin">Admin</a> → <strong>Operator Badge Barcodes</strong>.
+                    Scan (or paste) the badge barcode into <span class="pill">Badge Barcode</span> and set the <span class="pill">Operator ID</span>.
+                    After saving, scanning that badge will “log in” the operator for the day.
+                </p>
+                <p style="margin-top:10px;">
+                    <strong>Stations:</strong> Go to <a href="/admin">Admin</a> → <strong>USB Dongle Mapping</strong>.
+                    This maps each scanner device to a station code + display name (what shows up in reports).
+                </p>
+                <p style="margin-top:10px;">
+                    <strong>Label variations (CSV field mapping):</strong> Go to <a href="/admin">Admin</a> → <strong>USB Dongle Mapping</strong> → <strong>Barcode mapping…</strong>.
+                    Paste a raw scan, click <span class="pill">Split</span>, map columns (Job/Cabinet/Part/etc), then <span class="pill">Save</span>.
+                    This helps when different label formats use different delimiters or column order.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Label Printing Agent</h2>
+                <p>
+                    For one-click printing without browser dialogs, you need the **Innosaw Agent**.
+                </p>
+                <div class="link-list" style="margin-top:10px;">
+                    <a href="/static/downloads/InnosawAgent.zip" download="InnosawAgent.zip">📥 Download Innosaw Agent (Windows ZIP)</a>
+                    <div class="small help-copy" style="margin-top:6px;">
+                        Prefer ZIP (one-folder). It avoids Windows blocking one-file EXEs and you can extract it anywhere.
+                        <a href="/static/downloads/InnosawAgent.exe" download="InnosawAgent.exe" style="margin-left:6px;">Download EXE (legacy)</a>
+                    </div>
+                </div>
+                <p style="margin-top:10px;">
+                    <strong>Setup Instructions:</strong>
+                </p>
+                <ol class="help-list" style="line-height:1.6;">
+                    <li>Download the ZIP and extract it somewhere permanent (recommended: <span class="mono">C:\Innosaw\Agent\</span>).</li>
+                    <li>Run <strong>InnosawAgent.exe</strong> from that folder.</li>
+                    <li>If it's the first time, a <strong>Settings</strong> window will appear.</li>
+                    <li>Paste your <strong>Agent Token</strong> (get this from <a href="/admin">Admin</a> → Stations → Label Printing).</li>
+                    <li>Select your <strong>Printer</strong> from the dropdown list.</li>
+                    <li>Click <strong>Save & Start</strong>. The app will move to your system tray (near the clock).</li>
+                </ol>
+                <p class="help-copy" style="margin-top:10px; font-size:13px;">
+                    * Tip: Use the "Create Desktop Shortcut" button in Settings for easy access.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Reports & Mozaik</h2>
+                <p>
+                    The Reports page includes Mozaik tools. Upload <span class="pill">.mkzlbl</span> files under the Mozaik tab to enable expected-vs-scanned and scan enrichment.
+                </p>
+                <div class="help-divider">
+                    <p><strong>How to export from Mozaik:</strong></p>
+                    <ol class="help-list">
+                        <li>In Mozaik Optimizer, <strong>finalize optimization</strong> and <strong>create G-codes</strong>.</li>
+                        <li>Go to <strong>File → Export → Export to Label App...</strong></li>
+                        <li>Ensure you have a <strong>Device ID</strong> setup that can print labels.</li>
+                        <li>Check the <strong>Labels</strong> box for that device.</li>
+                        <li><strong>Naming Tip</strong>: Use "Job Name + Run #" for the Label Run Name.</li>
+                        <li>Once exported, upload the <span class="pill">.mkzlbl</span> file to the Dashboard.</li>
+                    </ol>
+                    <div class="help-img-container">
+                        <a href="#" onclick="openHelpModal(0); return false;" class="help-img-wrap">
+                            <img src="/static/img/help/mozaik_export_1.png" alt="Mozaik Export Menu" class="help-img" />
+                        </a>
+                        <a href="#" onclick="openHelpModal(1); return false;" class="help-img-wrap">
+                            <img src="/static/img/help/mozaik_export_2.png" alt="Mozaik Device Config" class="help-img" />
+                        </a>
+                        <a href="#" onclick="openHelpModal(2); return false;" class="help-img-wrap">
+                            <img src="/static/img/help/mozaik_export_3.png" alt="Upload to Dashboard" class="help-img" />
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Tooling Page</h2>
+                <p>
+                    The <strong>Tools</strong> page manages your tool inventory and tracks tool usage across machines.
+                </p>
+                <p style="margin-top:10px;">
+                    <strong>Main Features:</strong>
+                </p>
+                <ul class="help-list">
+                    <li><strong>Tool Inventory:</strong> View all tools grouped by type (Drills, Router, Edge, Other) or custom groups. Edit tool names, quantities, expected life, and assigned machines.</li>
+                    <li><strong>Tool Block Editor:</strong> In the "Tooling Layout" tab, visually draw and edit drill block configurations for each machine. Select cells, assign tools, and flip sides (L/R).</li>
+                    <li><strong>Machine Setup:</strong> See which tools are currently installed in each machine slot, with tool life tracking. Update quantities and tool assignments per slot.</li>
+                    <li><strong>Tool Change Logging:</strong> Log when tools are changed on machines. Track parts/sheets processed since the last change.</li>
+                    <li><strong>Bulk Operations:</strong> Select multiple tools and log changes for all of them at once.</li>
+                </ul>
+                <p style="margin-top:10px;">
+                    <strong>Tracking:</strong> Tools track usage in <span class="pill">parts</span> or <span class="pill">sheets</span> (for CNC machines). Counts reset when you log a tool change. You can filter by machine to see tool-specific usage.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Inventory Page</h2>
+                <p>
+                    The <strong>Inventory</strong> page tracks materials and stock levels across your shop.
+                </p>
+                <p style="margin-top:10px;">
+                    <strong>Main Features:</strong>
+                </p>
+                <ul class="help-list">
+                    <li><strong>Material Tracking:</strong> Track materials between all machines. View quantity, category, thickness, status, location, and last consumed date.</li>
+                    <li><strong>Parts & Sheets Tracking:</strong> Track usage for both parts and sheets. Filter by materials or part types to narrow down tracking.</li>
+                    <li><strong>Bulk Actions:</strong> Select multiple materials and perform bulk operations (Receive, Consume, Edit, Delete) using the sticky action bar at the top.</li>
+                    <li><strong>Quick Edit:</strong> Click on quantity to edit inline. Click on material name to expand details (supplier, SKU, order URL, notes).</li>
+                    <li><strong>Column Management:</strong> Drag column headers to reorder. Drag the resize handle (right edge) to adjust column widths.</li>
+                </ul>
+                <p style="margin-top:10px;">
+                    <strong>Filtering:</strong> Use the search bar and category filters to quickly find materials. Selected rows are highlighted for easy identification.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Maintenance Page</h2>
+                <p>
+                    The <strong>Maintenance</strong> page provides full tracking of machine downtime, maintenance events, and issues.
+                </p>
+                <p style="margin-top:10px;">
+                    <strong>Main Features:</strong>
+                </p>
+                <ul class="help-list">
+                    <li><strong>Downtime Tracking:</strong> Log downtime events with start/end times. System automatically calculates duration and parts processed since last maintenance.</li>
+                    <li><strong>Event Types:</strong> Categorize events (maintenance, breakdown, calibration, etc.). Search and filter by machine or event type.</li>
+                    <li><strong>Editable Descriptions:</strong> Edit event descriptions after creation. Add photos, notes, and assign to team members.</li>
+                    <li><strong>Inventory Metrics:</strong> View inventory metrics at the top of the page for quick reference.</li>
+                    <li><strong>Tool Change History:</strong> See complete history of tool changes across all machines with parts/sheets processed.</li>
+                    <li><strong>Machine Setup View:</strong> Quickly see what tools are currently in each machine and their tool life status.</li>
+                </ul>
+                <p style="margin-top:10px;">
+                    <strong>Search:</strong> Use the search bar to find events by machine, event type, tool, or description. Filter by resolved/unresolved status.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>Diagnostics</h2>
+                <p class="mono">/api/status</p>
+                <p class="mono">/api/debug/db</p>
+                <p style="margin-top:10px;">
+                    If something is blank, check the service logs:
+                </p>
+                <p class="mono">sudo journalctl -u qr-scanner -n 80 --no-pager</p>
+            </div>
+
+            <div class="card">
+                <h2>🔔 Push Notifications Setup</h2>
+                <p>Get instant notifications for chat messages, board updates, and more on desktop and mobile.</p>
+                
+                <p style="margin-top:12px;"><strong>Recommended Browsers:</strong></p>
+                <ul class="help-list">
+                    <li><strong>Desktop:</strong> Chrome, Edge, or Firefox (Safari has limited support)</li>
+                    <li><strong>Android:</strong> Chrome or Edge</li>
+                    <li><strong>iPhone/iPad:</strong> Safari (requires Add to Home Screen - see below)</li>
+                </ul>
+
+                <p style="margin-top:15px;"><strong>Desktop Setup:</strong></p>
+                <ol class="help-list">
+                    <li>Go to <a href="/notifications">Notifications</a> page</li>
+                    <li>Click <strong>"Enable Push Notifications"</strong></li>
+                    <li>When browser asks, click <strong>"Allow"</strong></li>
+                    <li>Click <strong>"Send Test Notification"</strong> to verify</li>
+                </ol>
+
+                <p style="margin-top:15px;"><strong>Android Setup:</strong></p>
+                <ol class="help-list">
+                    <li>Open site in <strong>Chrome</strong> or <strong>Edge</strong></li>
+                    <li>Tap the menu (⋮) → <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
+                    <li>Open the app from your home screen</li>
+                    <li>Go to Notifications → <strong>"Enable Push Notifications"</strong></li>
+                    <li>Allow notifications when prompted</li>
+                </ol>
+
+                <p style="margin-top:15px;"><strong>iPhone/iPad Setup:</strong></p>
+                <ol class="help-list">
+                    <li>Open site in <strong>Safari</strong> (required for iOS)</li>
+                    <li>Tap the <strong>Share</strong> button (box with arrow)</li>
+                    <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                    <li>Tap <strong>"Add"</strong> in the top right</li>
+                    <li>Open the app from your home screen</li>
+                    <li>Go to Notifications → <strong>"Enable Push Notifications"</strong></li>
+                </ol>
+
+                <div class="help-note">
+                    <strong>⚠️ Important:</strong> On iOS, push notifications ONLY work when the app is installed to your home screen. They won't work in the regular Safari browser.
+                </div>
+
+                <p style="margin-top:15px;"><strong>Troubleshooting:</strong></p>
+                <ul class="help-list">
+                    <li><strong>Not receiving notifications?</strong> Check your device's notification settings for the browser/app</li>
+                    <li><strong>"Enable" button not working?</strong> Try clearing site data and re-enabling</li>
+                    <li><strong>Test notification fails?</strong> Try disabling and re-enabling notifications</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>📄 Legal & Policies</h2>
+                <div class="link-list">
+                    <a href="/legal/privacy">Privacy Policy</a>
+                    <a href="/legal/terms">Terms of Service</a>
+                </div>
+                <p class="help-copy" style="margin-top: 12px; font-size: 13px;">
+                    Questions? Contact us at <a href="mailto:office@innosaw.com">office@innosaw.com</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" class="help-modal">
+        <span class="help-modal-close" onclick="closeHelpModal()">&times;</span>
+        <img class="help-modal-content" id="helpModalImg">
+        <div id="helpModalCaption" class="help-modal-caption"></div>
+        <a class="help-modal-prev" onclick="changeHelpModal(-1)">&#10094;</a>
+        <a class="help-modal-next" onclick="changeHelpModal(1)">&#10095;</a>
+    </div>
+
+    <script>
+        function openHelpModal(idx) {
+            const imgs = document.querySelectorAll('.help-img');
+            window._helpImages = Array.from(imgs).map(img => ({
+                src: img.src,
+                alt: img.alt
+            }));
+            window._curHelpIdx = idx;
+            updateHelpModal();
+            document.getElementById('helpModal').style.display = "flex";
+            document.body.style.overflow = "hidden"; // disable scroll
+        }
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = "none";
+            document.body.style.overflow = "auto";
+        }
+        function updateHelpModal() {
+            const img = document.getElementById('helpModalImg');
+            const caption = document.getElementById('helpModalCaption');
+            const data = window._helpImages[window._curHelpIdx];
+            img.src = data.src;
+            caption.innerText = data.alt;
+        }
+        function changeHelpModal(dir) {
+            window._curHelpIdx += dir;
+            if (window._curHelpIdx < 0) window._curHelpIdx = window._helpImages.length - 1;
+            if (window._curHelpIdx >= window._helpImages.length) window._curHelpIdx = 0;
+            updateHelpModal();
+        }
+        // Close on click outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('helpModal');
+            if (event.target == modal) {
+                // Don't close if there's active text selection
+                const selection = window.getSelection();
+                if (selection && selection.toString().length > 0) return;
+                closeHelpModal();
+            }
+        }
+        // ESC key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape") closeHelpModal();
+            if (document.getElementById('helpModal') && document.getElementById('helpModal').style.display === "flex") {
+                if (e.key === "ArrowLeft") changeHelpModal(-1);
+                if (e.key === "ArrowRight") changeHelpModal(1);
+            }
+        });
+
+        // Keep Bins link working on LAN + public tunnel
+        function fixExternalLinks() {
+            const host = window.location.hostname || 'localhost';
+            const proto = (window.location.protocol === 'https:') ? 'https' : 'http';
+            const portStr = window.location.port || '';
+
+            const hostParts = host.split('.');
+            const sub = hostParts[0];
+            const baseDomain = (hostParts.length >= 3 && (sub === 'qr' || sub === 'bins'))
+                ? hostParts.slice(1).join('.')
+                : null;
+            const onPublicHttps = !!baseDomain && proto === 'https';
+            const behindProxyNoPorts = !portStr || portStr === '80' || portStr === '443';
+
+            document.querySelectorAll('.ext-link').forEach(a => {
+                const port = a.getAttribute('data-port');
+                const path = a.getAttribute('data-path') || '/';
+                if (port === '5000') {
+                    if (onPublicHttps) { a.href = `https://bins.${baseDomain}${path}`; return; }
+                    if (behindProxyNoPorts) { a.href = `${proto}://${host}/bins${path.startsWith('/') ? path : `/${path}`}`; return; }
+                }
+                if (port) a.href = `${proto}://${host}:${port}${path}`;
+            });
+        }
+        fixExternalLinks();
+    </script>
+</body>
+</html>
+
+

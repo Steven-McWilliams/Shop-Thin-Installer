@@ -1,0 +1,2356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Log - Manufacturing Dashboard</title>
+    <link rel="stylesheet" href="/static/common.css?v=20260408c">
+    <link rel="stylesheet" href="/static/searchable-select.css?v=20260116">
+    <link rel="stylesheet" href="/static/contextual-help.css?v=20260118b">
+    <link rel="stylesheet" href="/static/mobile-nav.css?v=20260118">
+    <script src="/static/theme.js?v=20260416a"></script>
+    <script src="/static/mobile-nav.js?v=20260118"></script>
+    <style>
+        /* Page-specific styles only - common styles are in common.css */
+        
+        .filters {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            margin-bottom: 16px;
+        }
+        
+        .filters-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .filters .field {
+            min-width: 150px;
+            flex: 1;
+            max-width: 220px;
+        }
+        
+        .filters .field label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        
+        .filters .field input,
+        .filters .field select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+        
+        /* Expandable filter field (hidden by default) */
+        .filters .field.extra {
+            display: none;
+        }
+        .filters .field.extra.visible {
+            display: block;
+        }
+        
+        /* Remove button on added filters */
+        .filters .field .remove-filter {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #dc3545;
+            color: white;
+            border: none;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            display: none;
+        }
+        .filters.edit-mode .field.extra.visible .remove-filter {
+            display: block;
+        }
+        .filters .field.extra {
+            position: relative;
+        }
+        
+        /* Add filter button */
+        .add-filter-btn {
+            padding: 8px 14px;
+            background: var(--bg-tertiary);
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            height: 38px;
+        }
+        .add-filter-btn:hover {
+            background: var(--border-light);
+            border-color: var(--accent-primary);
+        }
+        .edit-filters-btn.active {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            border-style: solid;
+        }
+        
+        /* Filter picker dropdown */
+        .filter-picker {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px var(--card-shadow);
+            z-index: 100;
+            max-height: 300px;
+            overflow-y: auto;
+            min-width: 220px;
+            display: none;
+        }
+        .filter-picker.open {
+            display: block;
+        }
+        .filter-picker-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        .filter-picker-item:hover {
+            background: var(--bg-tertiary);
+        }
+        .filter-picker-item.active {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+        }
+        .filter-picker-item:last-child {
+            border-bottom: none;
+        }
+        
+        .filters .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .filters .actions .auto {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        
+        .filters .actions .auto input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .filters .actions .auto select {
+            padding: 8px 10px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        .part-ignore-tools {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+
+        .part-ignore-tools .btn {
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+
+        .filters .field[data-filter="part_name"] {
+            overflow: visible;
+        }
+
+        .part-filter-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .part-filter-header label {
+            margin-bottom: 0 !important;
+        }
+
+        .part-inline-edit-btn {
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .part-inline-edit-btn.active {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .part-ignore-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: min(420px, calc(100vw - 40px));
+            min-width: 280px;
+            padding: 12px;
+            background: var(--table-warning-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 12px 28px rgba(16, 24, 40, 0.14);
+            z-index: 30;
+            color: var(--table-warning-text);
+        }
+
+        .part-ignore-panel.open {
+            display: block;
+        }
+
+        .part-ignore-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .part-ignore-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+
+        .part-ignore-chip button {
+            border: none;
+            background: transparent;
+            color: var(--table-danger-text);
+            font-weight: 700;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .part-ignore-empty {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        /* Mobile filter adjustments */
+        @media (max-width: 520px) {
+            .filters-row {
+                flex-wrap: wrap;
+            }
+            /* Keep Station and Job side by side on mobile */
+            .filters .field[data-filter="station"],
+            .filters .field[data-filter="job"] {
+                flex: 1 1 45%;
+                min-width: 100px;
+                max-width: none;
+            }
+            /* Extra filters take full width */
+            .filters .field.extra {
+                flex: 1 1 100%;
+                min-width: 100%;
+            }
+            .part-ignore-panel {
+                width: max(100%, 280px);
+                min-width: 0;
+            }
+            .add-filter-btn {
+                flex: 0 0 auto;
+            }
+        }
+        
+        .summary {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        
+        .table-wrap {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 0;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            border: 1px solid var(--card-border);
+        }
+        
+        .pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid var(--border-color);
+        }
+
+        .mz-ok {
+            color: var(--accent-primary);
+            font-weight: 800;
+        }
+
+        .parse-diag-banner {
+            font-size: 13px;
+            color: #92400e;
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+
+        .scan-table-scroll-hint {
+            display: none !important;
+        }
+
+        .parse-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            text-transform: lowercase;
+        }
+        .parse-badge-ok { color: #166534; border-color: #86efac; background: #ecfdf5; }
+        .parse-badge-warn { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+        .parse-badge-error { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
+        .parse-badge-legacy { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
+
+        tr.scan-row-warn { background: rgba(251, 191, 36, 0.08); }
+        tr.scan-row-error { background: rgba(239, 68, 68, 0.08); }
+        tr.scan-row-recut { background: rgba(254, 243, 199, 0.35); }
+        tr.scan-row-recut-part { background: rgba(236, 253, 245, 0.35); }
+        tr.scan-row-warn:hover, tr.scan-row-error:hover { filter: brightness(0.98); }
+
+        /* Single table in one scroll container — keeps header/body columns aligned */
+        .scan-log-table-scroll {
+            width: 100%;
+            max-width: 100%;
+            max-height: calc(100vh - 280px);
+            min-height: 280px;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
+        }
+        .scan-log-table-scroll table {
+            display: table !important;
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+        }
+        .scan-log-table-scroll thead { display: table-header-group; }
+        .scan-log-table-scroll tbody { display: table-row-group; }
+        .scan-log-table-scroll tr { display: table-row; }
+        .scan-log-table-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--table-header-bg);
+            box-shadow: 0 1px 0 var(--border-color);
+        }
+        .scan-log-table-scroll th[data-col],
+        .scan-log-table-scroll td[data-col] {
+            white-space: nowrap;
+            min-width: 72px;
+        }
+        .scan-log-table-scroll td[data-col="time"] {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            background: var(--card-bg);
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+        }
+        .scan-log-table-scroll thead th[data-col="time"] {
+            left: 0;
+            z-index: 5;
+            background: var(--table-header-bg);
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06), 0 1px 0 var(--border-color);
+        }
+        .scan-log-table-scroll thead th .col-resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 6px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+        }
+        .recut-flow-badge {
+            display: inline-block;
+            margin-bottom: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid var(--border-color);
+        }
+        .recut-flow-armed { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+        .recut-flow-logged { background: #ecfdf5; border-color: #86efac; color: #166534; }
+        td[data-col="raw"] { white-space: pre-wrap; word-break: break-word; min-width: 280px; max-width: 520px; }
+        td[data-col="gcode"] { min-width: 140px; max-width: 320px; }
+        td[data-col="parse"], th[data-col="parse"] { min-width: 56px; text-align: center; }
+        td[data-col="mz"], th[data-col="mz"] { min-width: 48px; text-align: center; }
+        td[data-col="job"], td[data-col="cabname"], td[data-col="partname"], td[data-col="edge"] { min-width: 120px; }
+
+        .filters { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px var(--card-shadow); margin-bottom: 16px; }
+        .filters-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+        .filters .field { min-width: 150px; flex: 0 1 220px; max-width: 240px; }
+        .filters .field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+        .filters .field input, .filters .field select { width: 100%; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: 6px; font-size: 13px; background: var(--input-bg); color: var(--text-primary); }
+        .filters .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+        .filters .actions .auto { display: flex; align-items: center; gap: 8px; padding: 0 6px; font-size: 13px; color: var(--text-primary); }
+        .filters .actions .auto input[type="checkbox"] { width: 16px; height: 16px; }
+        .filters .actions .auto select { padding: 8px 10px; border: 1px solid var(--input-border); border-radius: 6px; font-size: 13px; background: var(--input-bg); color: var(--text-primary); }
+        .template-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); }
+        .template-bar .field { flex: 1 1 260px; max-width: none; }
+        .btn { padding: 9px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn-primary { background: var(--btn-primary-bg); color: var(--btn-primary-text); }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+
+        .summary { font-size: 13px; color: var(--text-primary); margin-bottom: 10px; }
+
+        .table-wrap { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 0; box-shadow: 0 2px 8px var(--card-shadow); }
+
+        @media (max-width: 900px) {
+            td { padding: 8px; font-size: 12px; }
+            th { padding: 8px; font-size: 11px; }
+        }
+
+        /* Mobile: wrap report sub-tabs (Scan Log page has many tabs) */
+        @media (max-width: 768px) {
+            .tabs-container { flex-wrap: wrap; overflow-x: visible; padding: 0; }
+            .tab-button { flex: 1 1 33%; min-width: 0; white-space: normal; line-height: 1.15; }
+        }
+        thead { background: var(--table-header-bg); }
+        th { text-align: left; padding: 10px; font-size: 12px; color: var(--table-header-text); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border-color); background: var(--table-header-bg); }
+        td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 13px; vertical-align: top; color: var(--text-primary); }
+        tr:hover { background: var(--table-row-hover); }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; }
+        .nowrap { white-space: nowrap; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 12px; font-weight: 700; border: 1px solid var(--border-color); }
+        .stacked-time { display: inline-flex; flex-direction: column; line-height: 1.15; }
+        .stacked-time .date { opacity: 0.85; }
+        .stacked-time .time { opacity: 0.95; }
+    </style>
+</head>
+<body>
+    <!-- Mobile Slide Menu -->
+    <div class="mobile_menu_overlay" id="mobile_menu_overlay" onclick="closeMobileMenu()"></div>
+    <div class="mobile_slide_menu" id="mobile_slide_menu">
+      <div class="mobile_menu_header"><h3>Menu</h3><button class="mobile_menu_close" onclick="closeMobileMenu()">×</button></div>
+      <nav class="mobile_menu_nav">
+        <div class="mobile_menu_section">Main</div>
+        <a href="/shop">🏠 Dashboard</a>
+        <button class="mobile_menu_expand" onclick="toggleMobileSubmenu(this)">📊 Reports</button>
+        <div class="mobile_menu_submenu">
+          <a href="/reports">📈 Main Report</a>
+          <a href="/reports#scan_log">📋 Scan Log</a>
+          <a href="/reports#part_search">🔍 Part Search</a>
+          <a href="/reports#detailed">📊 Detailed Reports</a>
+        </div>
+        <a href="/labels">🏷️ Labels</a>
+        <a href="/bins">📦 Bins</a>
+        <div class="mobile_menu_section">Production</div>
+        <a href="/mobile">📱 Mobile Scan</a>
+        <a href="/maintenance">🔧 Maintenance</a>
+        <a href="/inventory">📦 Inventory</a>
+        <a href="/scans" class="active">📝 Scan Log</a>
+        <a href="/tools">🛠️ Tools</a>
+        <a href="/recuts">🔄 Recuts</a>
+        <div class="mobile_menu_section">Office</div>
+        <a href="/chat">💬 Chat</a>
+        <a href="/boards">📋 Boards</a>
+        <a href="/schedule">📅 Schedule</a>
+        <a href="/notifications">🔔 Notifications</a>
+        <div class="mobile_menu_section">System</div>
+        <a href="/stations">⚙️ Admin</a>
+        <a href="/help">❓ Help</a>
+        <a href="/choose_shop">🔄 Switch Shop</a>
+        <a href="#" onclick="openMobileNavSettings(); closeMobileMenu(); return false;">📱 Customize Nav</a>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout_form').submit();">🚪 Logout</a>
+      </nav>
+    </div>
+
+    <div class="header">
+        <div class="mobile_header_row">
+          <button class="mobile_hamburger" onclick="openMobileMenu()">☰</button>
+          <h1>🧾 Scan Log</h1>
+        </div>
+        <h1 class="desktop_only">🧾 Scan Log</h1>
+        <div class="subtitle desktop_only">Search and filter raw scan data across all stations</div>
+        <div class="nav_primary">
+            <a class="nav_btn" href="/">Dashboard</a>
+            <a class="nav_btn active" href="/reports">Reports</a>
+            <a id="shop_link" class="nav_btn" href="/">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/admin">Admin</a>
+            <a class="nav_btn" href="/help">Help</a>
+            <a class="nav_btn ext-link" data-port="5000" data-path="/" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <button id="auth_btn" class="nav_btn" type="button" onclick="innosawAuthClick()">Login</button>
+        </div>
+    </div>
+    <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/mobile">Mobile Scan</a>
+        <a class="nav_btn" href="/maintenance">Maintenance</a>
+        <a class="nav_btn" href="/inventory">Inventory</a>
+        <a class="nav_btn" href="/tools">Tools</a>
+        <a class="nav_btn" href="/recuts">Recuts</a>
+    </div>
+    <div class="mobile_bottom_nav" id="mobile_bottom_nav"></div>
+    <script>
+        // In v2, "Shop" exists (/chat). In v1 it may not; default stays on "/".
+        (function () {
+            const a = document.getElementById('shop_link');
+            if (!a) return;
+            try {
+                fetch('/chat', { method: 'GET' }).then(r => {
+                    if (r && r.ok) a.setAttribute('href', '/chat');
+                }).catch(() => {});
+            } catch (e) {}
+        })();
+        // v1 local auth helper (works even when auth is disabled)
+        window.__innosawAuthRole = 'viewer';
+        async function innosawRefreshAuthBtn() {
+            const btn = document.getElementById('auth_btn');
+            if (!btn) return;
+            try {
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                window.__innosawAuthRole = (data && data.role) ? data.role : 'viewer';
+                const enabled = !!(data && data.enabled);
+                if (!enabled) {
+                    btn.style.display = 'none';
+                    return;
+                }
+                btn.style.display = 'inline-flex';
+                btn.textContent = (window.__innosawAuthRole && window.__innosawAuthRole !== 'viewer') ? 'Logout' : 'Login';
+            } catch (e) {
+                btn.style.display = 'none';
+            }
+        }
+        async function innosawAuthClick() {
+            try {
+                if (window.__innosawAuthRole && window.__innosawAuthRole !== 'viewer') {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/';
+                    return;
+                }
+            } catch (e) {}
+            window.location.href = '/login';
+        }
+        document.addEventListener('DOMContentLoaded', innosawRefreshAuthBtn);
+    </script>
+    
+    <div class="container">
+        <div class="tabs-container">
+            <button class="tab-button" onclick="window.location.href='/reports'">Main Report</button>
+            <button class="tab-button active" onclick="window.location.href='/scans'">Scan Log</button>
+            <button class="tab-button" onclick="window.location.href='/reports?tab=partsearch'">Part Search</button>
+            <button class="tab-button" onclick="window.location.href='/reports?tab=detailed'">Detailed Reports</button>
+        </div>
+        <div class="filters">
+            <div class="filters-row" id="filters_row">
+                <!-- Default visible filters -->
+                <div class="field" data-filter="station">
+                    <label>Station</label>
+                    <select id="f_station">
+                        <option value="">All</option>
+                        <option value="CNC">CNC</option>
+                        <option value="EDGE">Edge</option>
+                        <option value="DOWEL">Dowel</option>
+                        <option value="SORT">Sort</option>
+                        <option value="PULL">Pull</option>
+                        <option value="ASM">Assembly</option>
+                        <option value="QC">QC</option>
+                    </select>
+                </div>
+                <div class="field" data-filter="job">
+                    <label>Job / Client</label>
+                    <div class="searchable-select-wrap" id="f_job-wrap">
+                        <input type="text" class="searchable-select-input" id="f_job-input" placeholder="Type to filter..." autocomplete="off">
+                        <input type="hidden" id="f_job" value="">
+                        <div class="searchable-select-dropdown" id="f_job-dropdown"></div>
+                    </div>
+                </div>
+                
+                <!-- Extra filters (hidden by default) -->
+                <div class="field extra" data-filter="station_display">
+                    <button class="remove-filter" onclick="removeFilter('station_display')">×</button>
+                    <label>Station Display</label>
+                    <input id="f_station_display" placeholder="e.g. Assembly 1">
+                </div>
+                <div class="field extra" data-filter="cab_asm">
+                    <button class="remove-filter" onclick="removeFilter('cab_asm')">×</button>
+                    <label>Cabinet Assembly</label>
+                    <input id="f_cab_asm" placeholder="e.g. R1C5">
+                </div>
+                <div class="field extra" data-filter="room">
+                    <button class="remove-filter" onclick="removeFilter('room')">×</button>
+                    <label>Room #</label>
+                    <input id="f_room" type="number" placeholder="e.g. 1">
+                </div>
+                <div class="field extra" data-filter="cabnum">
+                    <button class="remove-filter" onclick="removeFilter('cabnum')">×</button>
+                    <label>Cabinet #</label>
+                    <input id="f_cabnum" type="number" placeholder="e.g. 14">
+                </div>
+                <div class="field extra" data-filter="cabtype">
+                    <button class="remove-filter" onclick="removeFilter('cabtype')">×</button>
+                    <label>Cab Type</label>
+                    <select id="f_cabtype">
+                        <option value="">All</option>
+                        <option value="cabinet">Cabinet</option>
+                        <option value="order_entry">Order Entry (R0)</option>
+                        <option value="non_cabinet">Non-Cabinet (N#)</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                </div>
+                <div class="field extra" data-filter="cab_name">
+                    <button class="remove-filter" onclick="removeFilter('cab_name')">×</button>
+                    <label>Cabinet / Room Name</label>
+                    <input id="f_cab_name" placeholder="e.g. Base Cabinet">
+                </div>
+                <div class="field extra" data-filter="part_name">
+                    <button class="remove-filter" onclick="removeFilter('part_name')">×</button>
+                    <div class="part-filter-header">
+                        <label>Part Name</label>
+                        <button class="part-inline-edit-btn" id="part_ignore_toggle" type="button" onclick="togglePartIgnorePanel()">Edit</button>
+                    </div>
+                    <div class="searchable-select-wrap" id="f_part_name-wrap">
+                        <input type="text" class="searchable-select-input" id="f_part_name-input" placeholder="Type to filter parts..." autocomplete="off">
+                        <input type="hidden" id="f_part_name" value="">
+                        <div class="searchable-select-dropdown" id="f_part_name-dropdown"></div>
+                    </div>
+
+                    <div id="part_ignore_panel" class="part-ignore-panel">
+                        <div style="font-weight:700;">Ignored Part Names</div>
+                        <div class="small" style="color:var(--text-secondary); margin-top:2px;">Ignore the current part or add one manually. Remove it anytime below.</div>
+                        <div class="part-ignore-tools" style="margin-top:10px;">
+                            <button class="btn btn-secondary" type="button" onclick="ignoreCurrentPartName()">Ignore Current</button>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:flex-end;">
+                            <div class="field" style="min-width:220px; flex:1; max-width:none; margin:0;">
+                                <label>Ignore Part Name</label>
+                                <input id="part_ignore_input" placeholder="Type a part name to ignore">
+                            </div>
+                            <button class="btn btn-secondary" type="button" onclick="savePartIgnoreFromInput()">Add</button>
+                        </div>
+                        <div id="part_ignore_msg" class="small" style="margin-top:8px; color:var(--text-secondary);"></div>
+                        <div id="part_ignore_list" class="part-ignore-list"></div>
+                    </div>
+                </div>
+                <div class="field extra" data-filter="part_no">
+                    <button class="remove-filter" onclick="removeFilter('part_no')">×</button>
+                    <label>Part #</label>
+                    <input id="f_part_no" list="dl_part_numbers" placeholder="e.g. 12345">
+                    <datalist id="dl_part_numbers"></datalist>
+                </div>
+                <div class="field extra" data-filter="raw">
+                    <button class="remove-filter" onclick="removeFilter('raw')">×</button>
+                    <label>Raw contains</label>
+                    <input id="f_raw" placeholder="any text">
+                </div>
+                <div class="field extra" data-filter="material">
+                    <button class="remove-filter" onclick="removeFilter('material')">×</button>
+                    <label>Material</label>
+                    <div class="searchable-select-wrap" id="f_material-wrap">
+                        <input type="text" class="searchable-select-input" id="f_material-input" placeholder="Type to filter..." autocomplete="off">
+                        <input type="hidden" id="f_material" value="">
+                        <div class="searchable-select-dropdown" id="f_material-dropdown"></div>
+                    </div>
+                </div>
+                <div class="field extra" data-filter="thickness">
+                    <button class="remove-filter" onclick="removeFilter('thickness')">×</button>
+                    <label>Thickness</label>
+                    <input id="f_thickness" list="dl_thickness" placeholder="e.g. 18.04">
+                    <datalist id="dl_thickness"></datalist>
+                </div>
+                <div class="field extra" data-filter="run">
+                    <button class="remove-filter" onclick="removeFilter('run')">×</button>
+                    <label>Run Name</label>
+                    <input id="f_run" list="dl_runs" placeholder="e.g. Run 1">
+                    <datalist id="dl_runs"></datalist>
+                </div>
+                <div class="field extra" data-filter="operator">
+                    <button class="remove-filter" onclick="removeFilter('operator')">×</button>
+                    <label>Operator</label>
+                    <input id="f_operator" list="dl_operators" placeholder="e.g. Steve">
+                    <datalist id="dl_operators"></datalist>
+                </div>
+                <div class="field extra" data-filter="opening">
+                    <button class="remove-filter" onclick="removeFilter('opening')">×</button>
+                    <label>Opening Letter</label>
+                    <input id="f_opening" placeholder="e.g. A">
+                </div>
+                <div class="field extra" data-filter="date">
+                    <button class="remove-filter" onclick="removeFilter('date')">×</button>
+                    <label>Date</label>
+                    <input id="f_date" type="date">
+                </div>
+                <div class="field extra" data-filter="limit">
+                    <button class="remove-filter" onclick="removeFilter('limit')">×</button>
+                    <label>Limit</label>
+                    <input id="f_limit" type="number" min="50" max="2000" step="50" value="200">
+                </div>
+                
+                <!-- Edit and Add Filter Buttons -->
+                <div style="display: flex; gap: 8px;" id="filter_actions_wrap">
+                    <button class="add-filter-btn edit-filters-btn" style="background: transparent; border-style: solid; border-color: transparent;" onclick="toggleFilterEditMode()" id="edit_filters_btn">Edit Filters</button>
+                    <div style="position: relative;" id="add_filter_wrap">
+                        <button class="add-filter-btn" onclick="toggleFilterPicker()">+ Add Filter</button>
+                        <div class="filter-picker" id="filter_picker">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Custom mapped fields (expandable) -->
+            <div id="custom_fields_filters" style="display: none; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">
+                <div style="font-weight: 600; margin-bottom: 8px; font-size: 12px; color: var(--text-secondary);">Custom Mapped Fields</div>
+                <div id="custom_fields_list" class="filters-row">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <div class="template-bar">
+                <div class="field">
+                    <label>Saved Search Template</label>
+                    <select id="scan_template_select" onchange="onScanTemplateSelect(this.value)">
+                        <option value="">Current filters</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="saveScanTemplate(false)">Save</button>
+                <button class="btn btn-secondary" onclick="saveScanTemplate(true)">Save As New</button>
+                <button class="btn btn-secondary" onclick="deleteScanTemplate()">Delete</button>
+                <div class="small" id="scan_template_msg" style="align-self:center; color:var(--text-secondary);"></div>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="loadScans()">Search</button>
+                <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+                <button class="btn btn-secondary" onclick="toggleColumnsPanel()">Columns…</button>
+                <div class="auto">
+                    <label><input type="checkbox" id="auto_refresh" checked> Auto-refresh</label>
+                    <select id="refresh_interval">
+                        <option value="2000">2s</option>
+                        <option value="3000" selected>3s</option>
+                        <option value="5000">5s</option>
+                        <option value="10000">10s</option>
+                    </select>
+                </div>
+                <div class="auto">
+                    <label><input type="checkbox" id="issues_only"> Issues only</label>
+                </div>
+                <div class="auto">
+                    <label title="Runs SNX/mkzlbl lookup (slower). Off by default for fast refresh."><input type="checkbox" id="label_lookup"> Verify labels</label>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="summary" id="summary">Loading…</div>
+        <div class="parse-diag-banner" id="parse_diag_banner" style="display:none;"></div>
+
+        <div id="columns_panel" style="display:none; margin: 10px 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; color: var(--text-primary); box-shadow: 0 2px 8px var(--card-shadow);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-weight:800;">Columns</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-secondary" onclick="showAllColumns()" style="padding:7px 10px;">Show all</button>
+                    <button class="btn btn-secondary" onclick="resetColumnWidths()" style="padding:7px 10px;">Reset widths</button>
+                </div>
+            </div>
+            <div class="small" style="margin-top:6px;">Hide/show columns and drag the header dividers to resize. Saved in this browser.</div>
+            <div id="columns_list" style="margin-top:10px; display:grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;"></div>
+        </div>
+
+        <div class="table-wrap scan-log-table-scroll" id="scan_log_table_wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="nowrap" data-col="time">Time</th>
+                        <th class="nowrap" data-col="delta">Last Scan</th>
+                        <th data-col="station">Station</th>
+                        <th data-col="job">Job_Name</th>
+                        <th class="nowrap" data-col="cabasm">Cab</th>
+                        <th class="nowrap" data-col="room">Room</th>
+                        <th class="nowrap" data-col="cabnum">Cab #</th>
+                        <th data-col="cabname">Cab_Name</th>
+                        <th data-col="partname">Part_Name</th>
+                        <th class="nowrap" data-col="partnum">Part_Num</th>
+                        <th class="nowrap" data-col="opening">Opening_letter</th>
+                        <th data-col="material">Part_Material</th>
+                        <th class="nowrap" data-col="parse" title="Parse mode / warnings">Parse</th>
+                        <th class="nowrap" data-col="mz" title="Matched label library (Mozaik mkzlbl or CV SNX)">Lbl</th>
+                        <th class="nowrap" data-col="thk">Thk</th>
+                        <th class="nowrap" data-col="len">Part_Length</th>
+                        <th class="nowrap" data-col="wid">Part_Width</th>
+                        <th data-col="edge">Edgeband_Info</th>
+                        <th data-col="run">Run_Name</th>
+                        <th data-col="c1">Custom_1</th>
+                        <th data-col="c2">Custom_2</th>
+                        <th data-col="c3">Custom_3</th>
+                        <th data-col="op">Operator</th>
+                        <th class="nowrap" data-col="gcode">Gcode_Filename</th>
+                        <th data-col="raw">Raw</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                    <tr><td colspan="25" style="padding: 20px; color: var(--text-secondary);">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function fixExternalLinks() {
+            const host = window.location.hostname || 'localhost';
+            const proto = (window.location.protocol === 'https:') ? 'https' : 'http';
+            const portStr = window.location.port || '';
+
+            const hostParts = host.split('.');
+            const sub = hostParts[0];
+            const baseDomain = (hostParts.length >= 3 && (sub === 'qr' || sub === 'bins'))
+                ? hostParts.slice(1).join('.')
+                : null;
+            const onPublicHttps = !!baseDomain && proto === 'https';
+            const behindProxyNoPorts = !portStr || portStr === '80' || portStr === '443';
+
+            document.querySelectorAll('.ext-link').forEach(a => {
+                const port = a.getAttribute('data-port');
+                const path = a.getAttribute('data-path') || '/';
+                if (port === '5007' && (onPublicHttps || behindProxyNoPorts)) {
+                    a.style.display = 'none';
+                    return;
+                }
+
+                if (port === '5000') {
+                    if (onPublicHttps) {
+                        a.href = `https://bins.${baseDomain}${path}`;
+                        return;
+                    }
+                    if (behindProxyNoPorts) {
+                        const p = path.startsWith('/') ? path : `/${path}`;
+                        a.href = `${proto}://${host}/bins${p}`;
+                        return;
+                    }
+                }
+
+                if (port) a.href = `${proto}://${host}:${port}${path}`;
+            });
+        }
+
+        function qs(id) { return document.getElementById(id); }
+
+        const TABLE_COLS = 25;
+
+        function escHtml(s) {
+            return (s || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function scanRowIsControl(s) {
+            if (s.scan_kind === 'control') return true;
+            const raw = (s.raw_data || '').toString().trim();
+            if (/^(recut|re-cut|recust|remake|damage|damaged)\b/i.test(raw)) return true;
+            if (/^(pull\s*)?bin\s*\d/i.test(raw)) return true;
+            let pj = s.parsed_json;
+            if (typeof pj === 'string') {
+                try { pj = JSON.parse(pj); } catch { pj = null; }
+            }
+            pj = (pj && typeof pj === 'object') ? pj : {};
+            const et = (pj.event_type || '').toString().toLowerCase();
+            if (['bin_select', 'cnc_remnant_control', 'recut_control', 'recut', 'label_print', 'bin_closed'].includes(et)) return true;
+            if (pj.bin_number) return true;
+            return false;
+        }
+
+        function scanHasIssue(s) {
+            if (scanRowIsControl(s)) return false;
+            const warning = (s.parse_warning || '').toString().trim();
+            const mode = (s.parse_mode || '').toString().trim();
+            if (warning) return true;
+            if (mode.startsWith('legacy')) return true;
+            if (s.label_lookup_skipped) return false;
+            const partNum = (s.part_num || '').toString().trim();
+            const partName = (s.part_name || '').toString().trim();
+            if (!s.label_match && (partNum || partName)) return true;
+            return false;
+        }
+
+        function scanIssueTitle(s) {
+            if (scanRowIsControl(s)) return '';
+            const warning = (s.parse_warning || '').toString().trim();
+            if (warning) return warning;
+            const mode = (s.parse_mode || '').toString().trim();
+            if (mode.startsWith('legacy')) return `Legacy parse (${mode}) — update Stations scan mapping`;
+            if (s.label_lookup_skipped) return 'Label lookup skipped — enable Verify labels to check SNX/mkzlbl';
+            if (!s.label_match) return 'No label library match for this job/part';
+            return '';
+        }
+
+        function formatParseCell(modeRaw, warningRaw, labelMatch, labelSkipped) {
+            const mode = (modeRaw || '').toString().trim();
+            const warning = (warningRaw || '').toString().trim();
+            if (warning) {
+                return `<span class="parse-badge parse-badge-error" title="${escHtml(warning)}">!</span>`;
+            }
+            if (mode === 'barcode_only') {
+                if (labelSkipped) {
+                    return '<span class="parse-badge parse-badge-ok" title="Mapped from barcode (label verify off)">map</span>';
+                }
+                if (labelMatch) {
+                    return '<span class="parse-badge parse-badge-ok" title="barcode_only + label match">map</span>';
+                }
+                return '<span class="parse-badge parse-badge-warn" title="Mapped scan, no label library match">map?</span>';
+            }
+            if (mode.startsWith('legacy')) {
+                return `<span class="parse-badge parse-badge-legacy" title="${escHtml(mode)}">leg</span>`;
+            }
+            if (mode) {
+                return `<span class="parse-badge" title="${escHtml(mode)}">${escHtml(mode.slice(0, 6))}</span>`;
+            }
+            return '-';
+        }
+
+        const ALWAYS_VISIBLE_COLS = new Set(['parse', 'mz']);
+
+        function getScanLogTable() {
+            return document.querySelector('#scan_log_table_wrap table');
+        }
+
+        function formatRecutFlowBadge(pj) {
+            pj = (pj && typeof pj === 'object') ? pj : {};
+            const et = (pj.event_type || '').toString().toLowerCase();
+            const recutId = pj.recut_id;
+            if (et === 'recut_control') {
+                const reason = (pj.reason || 'Recut').toString();
+                return `<div class="recut-flow-badge recut-flow-armed" title="Scan part label to log recut">Recut armed${reason && reason !== 'Recut' ? `: ${escHtml(reason)}` : ''}</div>`;
+            }
+            if (et === 'recut_part' && recutId) {
+                return `<div class="recut-flow-badge recut-flow-logged" title="Created recut entry">→ recut #${escHtml(String(recutId))}</div>`;
+            }
+            return '';
+        }
+
+        function visibleTableColCount() {
+            const table = getScanLogTable();
+            if (!table) return TABLE_COLS;
+            let n = 0;
+            table.querySelectorAll('thead th[data-col]').forEach(th => {
+                if (th.style.display !== 'none') n++;
+            });
+            return n || TABLE_COLS;
+        }
+
+        function syncScanTableScrollWidth() {
+            const wrap = document.getElementById('scan_log_table_wrap');
+            const table = getScanLogTable();
+            if (!wrap || !table) return;
+
+            let total = 0;
+            let visibleCount = 0;
+            table.querySelectorAll('thead th[data-col]').forEach(th => {
+                if (th.style.display === 'none') return;
+                visibleCount++;
+                const styledMin = parseFloat(th.style.minWidth) || parseFloat(th.style.width) || 0;
+                total += Math.max(styledMin, 72);
+            });
+            if (visibleCount > 0) {
+                table.style.width = 'max-content';
+                table.style.minWidth = Math.max(total, visibleCount * 72) + 'px';
+            }
+        }
+
+        function updateScanTableScrollHint() {
+            syncScanTableScrollWidth();
+        }
+
+        function parseTimestampMs(ts) {
+            const s = (ts || '').toString().trim();
+            if (!s) return NaN;
+            const normalized = (s.includes(' ') && !s.includes('T')) ? s.replace(' ', 'T') : s;
+            const ms = Date.parse(normalized);
+            return Number.isFinite(ms) ? ms : NaN;
+        }
+
+        function splitTimestamp(ts) {
+            const s = (ts || '').toString().trim();
+            if (!s) return { date: '', time: '' };
+            if (s.includes('T')) {
+                const [d, tRaw] = s.split('T');
+                const t = (tRaw || '').replace(/Z$/, '');
+                return { date: d || '', time: t || '' };
+            }
+            if (s.includes(' ')) {
+                const idx = s.indexOf(' ');
+                return { date: s.slice(0, idx), time: s.slice(idx + 1) };
+            }
+            return { date: s, time: '' };
+        }
+
+        function formatDeltaMs(ms) {
+            if (!Number.isFinite(ms) || ms <= 0) return '-';
+            const totalSeconds = Math.floor(ms / 1000);
+            const days = Math.floor(totalSeconds / 86400);
+            const hours = Math.floor((totalSeconds % 86400) / 3600);
+            const mins = Math.floor((totalSeconds % 3600) / 60);
+            const secs = totalSeconds % 60;
+
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${mins}m`;
+            if (mins > 0) return `${mins}m ${secs}s`;
+            return `${secs}s`;
+        }
+
+        function resetFilters(runSearch = true) {
+            qs('f_station').value = '';
+            qs('f_station_display').value = '';
+            qs('f_job').value = '';
+            qs('f_cab_asm').value = '';
+            qs('f_room').value = '';
+            qs('f_cabnum').value = '';
+            qs('f_cabtype').value = '';
+            qs('f_cab_name').value = '';
+            qs('f_part_name').value = '';
+            qs('f_part_no').value = '';
+            qs('f_raw').value = '';
+            qs('f_material').value = '';
+            qs('f_thickness').value = '';
+            qs('f_run').value = '';
+            qs('f_operator').value = '';
+            qs('f_opening').value = '';
+            qs('f_date').value = '';
+            qs('f_limit').value = 200;
+            // Hide all extra filters
+            document.querySelectorAll('.field.extra').forEach(f => f.classList.remove('visible'));
+            // Clear searchable inputs
+            const jobInput = document.getElementById('f_job-input');
+            if (jobInput) jobInput.value = '';
+            const partInput = document.getElementById('f_part_name-input');
+            if (partInput) partInput.value = '';
+            const matInput = document.getElementById('f_material-input');
+            if (matInput) matInput.value = '';
+            saveActiveFilters();
+            if (runSearch) loadScans();
+        }
+        
+        // ===== EXPANDABLE FILTER SYSTEM =====
+        const FILTER_OPTIONS = [
+            { id: 'station_display', label: 'Station Display' },
+            { id: 'cab_asm', label: 'Cabinet Assembly' },
+            { id: 'room', label: 'Room #' },
+            { id: 'cabnum', label: 'Cabinet #' },
+            { id: 'cabtype', label: 'Cab Type' },
+            { id: 'cab_name', label: 'Cabinet / Room Name' },
+            { id: 'part_name', label: 'Part Name' },
+            { id: 'part_no', label: 'Part #' },
+            { id: 'raw', label: 'Raw Contains' },
+            { id: 'material', label: 'Material' },
+            { id: 'thickness', label: 'Thickness' },
+            { id: 'run', label: 'Run Name' },
+            { id: 'operator', label: 'Operator' },
+            { id: 'opening', label: 'Opening Letter' },
+            { id: 'date', label: 'Date' },
+            { id: 'limit', label: 'Result Limit' }
+        ];
+        
+        function getActiveFilters() {
+            const active = [];
+            document.querySelectorAll('.field.extra.visible').forEach(f => {
+                active.push(f.getAttribute('data-filter'));
+            });
+            return active;
+        }
+        
+        function saveActiveFilters() {
+            try {
+                localStorage.setItem('scan_active_filters', JSON.stringify(getActiveFilters()));
+            } catch (e) {}
+        }
+        
+        function loadActiveFilters() {
+            try {
+                const saved = localStorage.getItem('scan_active_filters');
+                if (saved) {
+                    const filters = JSON.parse(saved);
+                    filters.forEach(id => addFilter(id, false));
+                }
+            } catch (e) {}
+        }
+        
+        function toggleFilterPicker() {
+            const picker = document.getElementById('filter_picker');
+            picker.classList.toggle('open');
+            if (picker.classList.contains('open')) {
+                renderFilterPicker();
+            }
+        }
+        
+        function renderFilterPicker() {
+            const picker = document.getElementById('filter_picker');
+            const active = getActiveFilters();
+            
+            picker.innerHTML = FILTER_OPTIONS.map(opt => {
+                const isActive = active.includes(opt.id);
+                return `<div class="filter-picker-item ${isActive ? 'active' : ''}" onclick="addFilter('${opt.id}')">${opt.label} ${isActive ? '✓' : ''}</div>`;
+            }).join('');
+        }
+        
+        function addFilter(filterId, save = true) {
+            const field = document.querySelector(`.field.extra[data-filter="${filterId}"]`);
+            if (field) {
+                field.classList.add('visible');
+                // Move to before the Add Filter button wrapper
+                const actionsWrap = document.getElementById('filter_actions_wrap');
+                if (actionsWrap && field.parentNode) {
+                    actionsWrap.parentNode.insertBefore(field, actionsWrap);
+                }
+            }
+            if (save) {
+                saveActiveFilters();
+                renderFilterPicker();
+            }
+            // Close picker
+            document.getElementById('filter_picker').classList.remove('open');
+        }
+        
+        function removeFilter(filterId) {
+            const field = document.querySelector(`.field.extra[data-filter="${filterId}"]`);
+            if (field) {
+                field.classList.remove('visible');
+                // Clear the input value
+                const input = field.querySelector('input, select');
+                if (input) input.value = '';
+            }
+            saveActiveFilters();
+        }
+
+        function toggleFilterEditMode() {
+            const filtersWrap = document.querySelector('.filters');
+            const btn = document.getElementById('edit_filters_btn');
+            if (filtersWrap.classList.contains('edit-mode')) {
+                filtersWrap.classList.remove('edit-mode');
+                btn.classList.remove('active');
+            } else {
+                filtersWrap.classList.add('edit-mode');
+                btn.classList.add('active');
+            }
+        }
+        
+        // Close picker when clicking outside
+        document.addEventListener('click', function(e) {
+            const picker = document.getElementById('filter_picker');
+            const wrap = document.getElementById('add_filter_wrap');
+            if (picker && wrap && !wrap.contains(e.target)) {
+                picker.classList.remove('open');
+            }
+        });
+
+        function buildParams() {
+            const p = new URLSearchParams();
+            const station = qs('f_station').value.trim();
+            const station_display_name = qs('f_station_display').value.trim();
+            const job_name = qs('f_job').value.trim();
+            const cabinet_assembly = qs('f_cab_asm').value.trim();
+            const room_num = (qs('f_room').value || '').toString().trim();
+            const cabinet_num = (qs('f_cabnum').value || '').toString().trim();
+            const cab_type = qs('f_cabtype').value.trim();
+            const cabinet_name = qs('f_cab_name').value.trim();
+            const part_name = qs('f_part_name').value.trim();
+            const part_no = qs('f_part_no').value.trim();
+            const raw = qs('f_raw').value.trim();
+            const material = qs('f_material').value.trim();
+            const material_thickness = qs('f_thickness').value.trim();
+            const run_name = qs('f_run').value.trim();
+            const operator_id = qs('f_operator').value.trim();
+            const opening_letter = qs('f_opening').value.trim();
+            const date = qs('f_date').value;
+            const limit = qs('f_limit').value || '200';
+
+            if (station) p.set('station', station);
+            if (station_display_name) p.set('station_display_name', station_display_name);
+            if (job_name) p.set('job_name', job_name);
+            if (cabinet_assembly) p.set('cabinet_assembly', cabinet_assembly);
+            if (room_num) p.set('room_num', room_num);
+            if (cabinet_num) p.set('cabinet_num', cabinet_num);
+            if (cab_type) p.set('cab_type', cab_type);
+            if (cabinet_name) p.set('cabinet_name', cabinet_name);
+            if (part_name) p.set('part_name', part_name);
+            if (part_no) p.set('part_no', part_no);
+            if (raw) p.set('raw', raw);
+            if (material) p.set('material', material);
+            if (material_thickness) p.set('material_thickness', material_thickness);
+            if (run_name) p.set('run_name', run_name);
+            if (operator_id) p.set('operator_id', operator_id);
+            if (opening_letter) p.set('opening_letter', opening_letter);
+            if (date) p.set('date', date);
+            
+            // Add custom field filters
+            document.querySelectorAll('[id^="f_custom_"]').forEach(input => {
+                const fieldName = input.id.replace('f_custom_', '');
+                const value = input.value.trim();
+                if (value) {
+                    p.set(`custom_${fieldName}`, value);
+                }
+            });
+            
+            p.set('limit', limit);
+            if (qs('label_lookup')?.checked) p.set('label_lookup', '1');
+            return p;
+        }
+        
+        async function loadCustomFieldFilters() {
+            const container = document.getElementById('custom_fields_list');
+            if (!container) return;
+            
+            try {
+                const res = await fetch('/api/admin/label_import_mapping/mozaik/custom_fields');
+                const data = await res.json();
+                if (!res.ok || !data.success) return;
+                
+                const fields = data.custom_fields || [];
+                if (fields.length === 0) {
+                    container.parentElement.style.display = 'none';
+                    return;
+                }
+                
+                container.innerHTML = fields.map(field => {
+                    const safeId = `f_custom_${field.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+                    const safeField = field.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    return `
+                        <div class="field">
+                            <label>${safeField}</label>
+                            <input id="${safeId}" placeholder="Filter by ${safeField}">
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load custom fields:', e);
+                container.parentElement.style.display = 'none';
+            }
+        }
+        
+        // Searchable select instances
+        let _jobSelect = null;
+        let _partSelect = null;
+        let _materialSelect = null;
+        let PART_NAME_IGNORES = [];
+        let SCAN_TEMPLATES = [];
+        let SCAN_DEFAULT_TEMPLATE = '';
+
+        const SCAN_TEMPLATE_FIELDS = {
+            station: 'f_station',
+            station_display_name: 'f_station_display',
+            job_name: 'f_job',
+            cabinet_assembly: 'f_cab_asm',
+            room_num: 'f_room',
+            cabinet_num: 'f_cabnum',
+            cab_type: 'f_cabtype',
+            cabinet_name: 'f_cab_name',
+            part_name: 'f_part_name',
+            part_no: 'f_part_no',
+            raw: 'f_raw',
+            material: 'f_material',
+            material_thickness: 'f_thickness',
+            run_name: 'f_run',
+            operator_id: 'f_operator',
+            opening_letter: 'f_opening',
+            date: 'f_date',
+            limit: 'f_limit',
+        };
+
+        const EXTRA_FILTER_TO_PARAM = {
+            station_display: 'station_display_name',
+            cab_asm: 'cabinet_assembly',
+            room: 'room_num',
+            cabnum: 'cabinet_num',
+            cabtype: 'cab_type',
+            cab_name: 'cabinet_name',
+            part_name: 'part_name',
+            part_no: 'part_no',
+            raw: 'raw',
+            material: 'material',
+            thickness: 'material_thickness',
+            run: 'run_name',
+            operator: 'operator_id',
+            opening: 'opening_letter',
+            date: 'date',
+            limit: 'limit',
+        };
+
+        function setFilterValue(elId, value) {
+            const el = qs(elId);
+            if (!el) return;
+            el.value = value || '';
+            if (elId === 'f_job') {
+                const input = qs('f_job-input');
+                if (input) input.value = value || '';
+            }
+            if (elId === 'f_part_name') {
+                const input = qs('f_part_name-input');
+                if (input) input.value = value || '';
+            }
+            if (elId === 'f_material') {
+                const input = qs('f_material-input');
+                if (input) input.value = value || '';
+            }
+        }
+
+        function setPartIgnoreMessage(message = '', isError = false) {
+            const el = qs('part_ignore_msg');
+            if (!el) return;
+            el.textContent = message || '';
+            el.style.color = isError ? 'var(--table-danger-text)' : 'var(--text-secondary)';
+        }
+
+        function togglePartIgnorePanel(forceOpen) {
+            const panel = qs('part_ignore_panel');
+            const toggle = qs('part_ignore_toggle');
+            if (!panel) return;
+            const nextOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+            panel.classList.toggle('open', nextOpen);
+            if (toggle) {
+                toggle.classList.toggle('active', nextOpen);
+                toggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+                toggle.textContent = nextOpen ? 'Close' : 'Edit';
+            }
+            if (nextOpen) {
+                renderPartIgnoreList();
+                const input = qs('part_ignore_input');
+                if (input) requestAnimationFrame(() => input.focus());
+            }
+        }
+
+        function renderPartIgnoreList() {
+            const list = qs('part_ignore_list');
+            if (!list) return;
+            if (!Array.isArray(PART_NAME_IGNORES) || PART_NAME_IGNORES.length === 0) {
+                list.innerHTML = '<div class="part-ignore-empty">No ignored part names yet.</div>';
+                return;
+            }
+            const escText = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escAttr = (v) => String(v || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            list.innerHTML = PART_NAME_IGNORES
+                .slice()
+                .sort((a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' }))
+                .map(name => {
+                    const value = String(name || '');
+                    return `<span class="part-ignore-chip">${escText(value)}<button type="button" data-part-name="${escAttr(encodeURIComponent(value))}" onclick="removeIgnoredPartName(decodeURIComponent(this.dataset.partName))">×</button></span>`;
+                })
+                .join('');
+        }
+
+        async function loadPartIgnoreList() {
+            try {
+                const res = await fetch('/api/part_name_ignores');
+                const data = await res.json().catch(() => ({}));
+                PART_NAME_IGNORES = Array.isArray(data.ignored_part_names) ? data.ignored_part_names : [];
+                renderPartIgnoreList();
+            } catch (e) {
+                console.error('Failed to load ignored part names:', e);
+            }
+        }
+
+        async function updatePartIgnoreList(action, payload) {
+            const res = await fetch('/api/part_name_ignores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, ...payload }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) {
+                throw new Error(data.error || 'Failed to update ignore list');
+            }
+            PART_NAME_IGNORES = Array.isArray(data.ignored_part_names) ? data.ignored_part_names : [];
+            const normalizePartName = (value) => String(value || '').replace(/^\d+\s*/, '').trim().toLowerCase();
+            const currentPartValue = (qs('f_part_name')?.value || qs('f_part_name-input')?.value || '').toString();
+            if (currentPartValue && PART_NAME_IGNORES.some(name => normalizePartName(name) === normalizePartName(currentPartValue))) {
+                setFilterValue('f_part_name', '');
+            }
+            renderPartIgnoreList();
+            await loadSearchablePartNames();
+            return data;
+        }
+
+        async function savePartIgnoreFromInput() {
+            const input = qs('part_ignore_input');
+            const value = (input?.value || '').toString().trim();
+            if (!value) {
+                setPartIgnoreMessage('Enter a part name to ignore.', true);
+                return;
+            }
+            try {
+                await updatePartIgnoreList('add', { part_name: value });
+                if (input) input.value = '';
+                setPartIgnoreMessage(`Ignored "${value}".`);
+            } catch (e) {
+                setPartIgnoreMessage(e.message || 'Failed to add ignored part name.', true);
+            }
+        }
+
+        async function ignoreCurrentPartName() {
+            const current = (qs('f_part_name')?.value || qs('f_part_name-input')?.value || '').toString().trim();
+            if (!current) {
+                setPartIgnoreMessage('Choose or type a part name first.', true);
+                togglePartIgnorePanel(true);
+                return;
+            }
+            try {
+                await updatePartIgnoreList('add', { part_name: current });
+                setFilterValue('f_part_name', '');
+                setPartIgnoreMessage(`Ignored "${current}".`);
+                togglePartIgnorePanel(true);
+            } catch (e) {
+                setPartIgnoreMessage(e.message || 'Failed to ignore current part name.', true);
+                togglePartIgnorePanel(true);
+            }
+        }
+
+        async function removeIgnoredPartName(partName) {
+            try {
+                await updatePartIgnoreList('remove', { part_name: partName });
+                setPartIgnoreMessage(`Removed "${partName}" from the ignore list.`);
+            } catch (e) {
+                setPartIgnoreMessage(e.message || 'Failed to remove ignored part name.', true);
+            }
+        }
+
+        function collectCurrentScanTemplateState() {
+            const filters = {};
+            Object.entries(SCAN_TEMPLATE_FIELDS).forEach(([key, elId]) => {
+                const val = (qs(elId)?.value || '').toString().trim();
+                if (val) filters[key] = val;
+            });
+            return {
+                filters,
+                active_filters: getActiveFilters(),
+            };
+        }
+
+        function renderScanTemplateOptions() {
+            const sel = qs('scan_template_select');
+            if (!sel) return;
+            const current = sel.value || SCAN_DEFAULT_TEMPLATE || '';
+            const escOpt = (v) => (v || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            sel.innerHTML = '<option value="">Current filters</option>' + SCAN_TEMPLATES.map(t => `<option value="${escOpt(t.id)}">${escOpt(t.name)}${t.id === SCAN_DEFAULT_TEMPLATE ? ' ★' : ''}</option>`).join('');
+            sel.value = SCAN_TEMPLATES.some(t => t.id === current) ? current : '';
+        }
+
+        async function persistScanTemplatePrefs() {
+            const res = await fetch('/api/user/preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    scan_search_templates: SCAN_TEMPLATES,
+                    scan_default_template: SCAN_DEFAULT_TEMPLATE || null,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) throw new Error(data.error || res.statusText || 'Failed to save templates');
+            return data.preferences || {};
+        }
+
+        function applyScanTemplate(template, shouldSearch = true) {
+            if (!template || typeof template !== 'object') return;
+            resetFilters(false);
+            const filters = (template.filters && typeof template.filters === 'object') ? template.filters : {};
+            Object.entries(SCAN_TEMPLATE_FIELDS).forEach(([key, elId]) => {
+                setFilterValue(elId, filters[key] || '');
+            });
+            const active = Array.isArray(template.active_filters) ? template.active_filters : [];
+            active.forEach(id => addFilter(id, false));
+            Object.entries(EXTRA_FILTER_TO_PARAM).forEach(([filterId, paramKey]) => {
+                if (filters[paramKey]) addFilter(filterId, false);
+            });
+            saveActiveFilters();
+            SCAN_DEFAULT_TEMPLATE = template.id || '';
+            renderScanTemplateOptions();
+            if (shouldSearch) loadScans();
+        }
+
+        async function loadScanTemplatePrefs() {
+            try {
+                const res = await fetch('/api/user/preferences');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) return;
+                const prefs = (data.preferences && typeof data.preferences === 'object') ? data.preferences : {};
+                SCAN_TEMPLATES = Array.isArray(prefs.scan_search_templates) ? prefs.scan_search_templates : [];
+                SCAN_DEFAULT_TEMPLATE = (prefs.scan_default_template || '').toString();
+                renderScanTemplateOptions();
+            } catch (e) {
+                console.error('Failed to load scan template preferences:', e);
+            }
+        }
+
+        async function onScanTemplateSelect(templateId) {
+            const tid = (templateId || '').toString();
+            if (!tid) return;
+            const template = SCAN_TEMPLATES.find(t => t.id === tid);
+            if (!template) return;
+            applyScanTemplate(template, true);
+            try {
+                await persistScanTemplatePrefs();
+                const msg = qs('scan_template_msg');
+                if (msg) msg.textContent = `Using "${template.name}" as your default.`;
+            } catch (e) {
+                const msg = qs('scan_template_msg');
+                if (msg) msg.textContent = e.message || 'Failed to save default template';
+            }
+        }
+
+        async function saveScanTemplate(forceNew) {
+            const msg = qs('scan_template_msg');
+            if (msg) msg.textContent = '';
+            const sel = qs('scan_template_select');
+            const selectedId = (sel?.value || '').toString();
+            let existing = (!forceNew && selectedId) ? SCAN_TEMPLATES.find(t => t.id === selectedId) : null;
+            let name = existing ? existing.name : '';
+            if (!existing || forceNew) {
+                name = window.prompt('Template name:', name || 'My Scan Search');
+                name = (name || '').toString().trim();
+                if (!name) return;
+                existing = { id: `scan-${Date.now()}`, name };
+                SCAN_TEMPLATES = SCAN_TEMPLATES.filter(t => t.id !== existing.id);
+                SCAN_TEMPLATES.push(existing);
+            }
+            const state = collectCurrentScanTemplateState();
+            existing.name = name || existing.name;
+            existing.filters = state.filters;
+            existing.active_filters = state.active_filters;
+            SCAN_TEMPLATES = SCAN_TEMPLATES.map(t => t.id === existing.id ? existing : t);
+            SCAN_DEFAULT_TEMPLATE = existing.id;
+            try {
+                await persistScanTemplatePrefs();
+                renderScanTemplateOptions();
+                if (sel) sel.value = existing.id;
+                if (msg) msg.textContent = `Saved "${existing.name}".`;
+            } catch (e) {
+                if (msg) msg.textContent = e.message || 'Failed to save template';
+            }
+        }
+
+        async function deleteScanTemplate() {
+            const sel = qs('scan_template_select');
+            const selectedId = (sel?.value || '').toString();
+            if (!selectedId) {
+                const msg = qs('scan_template_msg');
+                if (msg) msg.textContent = 'Select a template first.';
+                return;
+            }
+            const existing = SCAN_TEMPLATES.find(t => t.id === selectedId);
+            if (!existing) return;
+            if (!window.confirm(`Delete template "${existing.name}"?`)) return;
+            SCAN_TEMPLATES = SCAN_TEMPLATES.filter(t => t.id !== selectedId);
+            if (SCAN_DEFAULT_TEMPLATE === selectedId) SCAN_DEFAULT_TEMPLATE = '';
+            try {
+                await persistScanTemplatePrefs();
+                renderScanTemplateOptions();
+                if (sel) sel.value = '';
+                const msg = qs('scan_template_msg');
+                if (msg) msg.textContent = `Deleted "${existing.name}".`;
+            } catch (e) {
+                const msg = qs('scan_template_msg');
+                if (msg) msg.textContent = e.message || 'Failed to delete template';
+            }
+        }
+        
+        async function loadSearchableJobs() {
+            try {
+                const res = await fetch('/api/reports/jobs?window=all&limit=200');
+                const data = await res.json().catch(() => ({}));
+                const jobs = (Array.isArray(data.jobs) ? data.jobs : []).sort((a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' }));
+                
+                if (!_jobSelect) {
+                    _jobSelect = initSearchableSelect({
+                        inputId: 'f_job-input',
+                        hiddenId: 'f_job',
+                        dropdownId: 'f_job-dropdown',
+                        options: ['', ...jobs],
+                        placeholder: 'Type to filter jobs...',
+                        emptyLabel: '(All Jobs)',
+                        onChange: () => {}
+                    });
+                } else {
+                    _jobSelect.setOptions(['', ...jobs]);
+                }
+                const currentJob = (qs('f_job')?.value || '').toString();
+                if (currentJob) setFilterValue('f_job', currentJob);
+            } catch (e) {
+                console.error('Failed to load jobs:', e);
+            }
+        }
+
+        async function loadSearchablePartNames() {
+            try {
+                const res = await fetch('/api/autocomplete/part_name?limit=10000');
+                const data = await res.json().catch(() => ({}));
+                const partNames = (Array.isArray(data.values) ? data.values : []).sort((a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' }));
+
+                if (!_partSelect) {
+                    _partSelect = initSearchableSelect({
+                        inputId: 'f_part_name-input',
+                        hiddenId: 'f_part_name',
+                        dropdownId: 'f_part_name-dropdown',
+                        options: partNames,
+                        placeholder: 'Type to filter parts...',
+                        onChange: () => {}
+                    });
+                } else {
+                    _partSelect.setOptions(partNames);
+                }
+                const currentPartName = (qs('f_part_name')?.value || '').toString();
+                if (currentPartName) setFilterValue('f_part_name', currentPartName);
+            } catch (e) {
+                console.error('Failed to load part names:', e);
+            }
+        }
+        
+        async function loadSearchableMaterials() {
+            try {
+                const res = await fetch('/api/reports/materials?limit=100');
+                const data = await res.json().catch(() => ({}));
+                const materials = (Array.isArray(data.materials) ? data.materials : []).sort((a, b) => String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' }));
+                
+                if (!_materialSelect) {
+                    _materialSelect = initSearchableSelect({
+                        inputId: 'f_material-input',
+                        hiddenId: 'f_material',
+                        dropdownId: 'f_material-dropdown',
+                        options: ['', ...materials],
+                        placeholder: 'Type to filter materials...',
+                        emptyLabel: '(All Materials)',
+                        onChange: () => {}
+                    });
+                } else {
+                    _materialSelect.setOptions(['', ...materials]);
+                }
+                const currentMaterial = (qs('f_material')?.value || '').toString();
+                if (currentMaterial) setFilterValue('f_material', currentMaterial);
+            } catch (e) {
+                console.error('Failed to load materials:', e);
+            }
+        }
+        
+        // Load custom field filters on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadActiveFilters(); // Restore previously active extra filters
+            loadCustomFieldFilters();
+            const partIgnoreInput = qs('part_ignore_input');
+            if (partIgnoreInput) {
+                partIgnoreInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        savePartIgnoreFromInput();
+                    }
+                });
+            }
+            await Promise.all([
+                loadSearchableJobs(),
+                loadSearchablePartNames(),
+                loadSearchableMaterials(),
+                loadPartIgnoreList(),
+                loadScanTemplatePrefs(),
+            ]);
+            // Populate station dropdown from server so it always matches real station_code values.
+            (async function loadStationOptions() {
+                try {
+                    const sel = document.getElementById('f_station');
+                    if (!sel) return;
+                    const res = await fetch('/api/stations');
+                    const data = await res.json().catch(() => ({}));
+                    const rows = data.stations || [];
+                    if (!Array.isArray(rows) || rows.length === 0) return;
+                    // Keep the first "All" option, then rebuild the rest.
+                    const keep = sel.options[0] ? sel.options[0].outerHTML : '<option value=\"\">All</option>';
+                    const opts = rows
+                        .filter(r => r && r.station_code)
+                        .map(r => {
+                            const code = String(r.station_code || '').trim();
+                            const name = String(r.display_name || r.station_code || '').trim();
+                            if (!code) return '';
+                            const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                            const safeCode = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
+                            return `<option value=\"${safeCode}\">${safeName}</option>`;
+                        })
+                        .filter(Boolean)
+                        .join('');
+                    sel.innerHTML = keep + opts;
+                } catch (e) {
+                    // Fallback to static options
+                }
+            })();
+
+            try {
+                const sp = new URL(window.location.href).searchParams;
+                const hasUrlFilters = Array.from(sp.keys()).length > 0;
+                if (!hasUrlFilters && SCAN_DEFAULT_TEMPLATE) {
+                    const template = SCAN_TEMPLATES.find(t => t.id === SCAN_DEFAULT_TEMPLATE);
+                    if (template) applyScanTemplate(template, false);
+                }
+            } catch {
+                // ignore
+            }
+
+            loadScans(false);
+            _startAutoRefresh();
+            qs('issues_only')?.addEventListener('change', () => loadScans(false));
+            qs('label_lookup')?.addEventListener('change', () => loadScans(false));
+            window.addEventListener('resize', updateScanTableScrollHint);
+        });
+
+        let _autoTimer = null;
+        let _lastQueryKey = '';
+        let _isLoading = false;
+
+        function _queryKey() {
+            return buildParams().toString();
+        }
+
+        function _userIsTyping() {
+            const el = document.activeElement;
+            if (!el) return false;
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+                return true;
+            }
+            return false;
+        }
+
+        function _startAutoRefresh() {
+            _stopAutoRefresh();
+            const enabled = qs('auto_refresh')?.checked;
+            if (!enabled) return;
+            const interval = parseInt(qs('refresh_interval')?.value || '3000', 10);
+            _autoTimer = setInterval(() => {
+                if (_isLoading) return;
+                if (_userIsTyping()) return; // don't jump results while typing
+                loadScans(true);
+            }, isNaN(interval) ? 3000 : interval);
+        }
+
+        function _stopAutoRefresh() {
+            if (_autoTimer) clearInterval(_autoTimer);
+            _autoTimer = null;
+        }
+
+        async function loadScans(isAuto=false) {
+            const tbody = qs('tbody');
+            const summary = qs('summary');
+            const params = buildParams();
+            const queryKey = params.toString();
+
+            if (!isAuto) {
+                const colSpan = visibleTableColCount();
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" style="padding: 20px; color: var(--text-secondary);">Loading…</td></tr>`;
+                summary.textContent = 'Loading…';
+                syncScanTableScrollWidth();
+            }
+
+            // If auto refresh and query hasn't changed, keep UI stable (no "Loading…" flashes)
+            _isLoading = true;
+
+            const res = await fetch(`/api/scans?${params.toString()}`);
+            const data = await res.json();
+            _isLoading = false;
+            _lastQueryKey = queryKey;
+
+            if (data.error) {
+                summary.textContent = `Error: ${data.error}`;
+                tbody.innerHTML = `<tr><td colspan="${TABLE_COLS}" style="padding: 20px; color: #b00;">${data.error}</td></tr>`;
+                return;
+            }
+
+            const scansAll = data.scans || [];
+            const issuesOnly = !!qs('issues_only')?.checked;
+            const scans = issuesOnly ? scansAll.filter(scanHasIssue) : scansAll;
+
+            const diag = data.parse_diagnostics || {};
+            const issueCount = scansAll.filter(scanHasIssue).length;
+            let summaryText = `Showing ${scans.length}${issuesOnly ? ' issue' : ''} of ${data.count || scansAll.length} loaded (${data.total ?? scansAll.length} total, limit ${data.limit || ''})`;
+            if (issueCount) {
+                summaryText += ` · ${issueCount} with parse issues`;
+            } else if (!data.label_lookup) {
+                summaryText += ' · label verify off (fast mode)';
+            }
+            summary.textContent = summaryText;
+
+            const banner = qs('parse_diag_banner');
+            if (banner) {
+                if (issueCount) {
+                    const parts = [];
+                    if (diag.warn) parts.push(`${diag.warn} parse warning(s)`);
+                    if (diag.legacy) parts.push(`${diag.legacy} legacy parse(s)`);
+                    if (diag.no_label) parts.push(`${diag.no_label} no label match`);
+                    banner.textContent = `${issueCount} part scan(s) need attention${parts.length ? ': ' + parts.join(', ') : ''}. Bin/recut scans excluded. Enable Verify labels to check SNX/mkzlbl. Fix mapping in Stations → Test parse.`;
+                    banner.style.display = 'block';
+                } else {
+                    banner.textContent = '';
+                    banner.style.display = 'none';
+                }
+            }
+
+            if (!scans.length) {
+                tbody.innerHTML = `<tr><td colspan="${TABLE_COLS}" style="padding: 20px; color: var(--text-secondary);">${issuesOnly ? 'No issues in this result set' : 'No results'}</td></tr>`;
+                updateScanTableScrollHint();
+                return;
+            }
+
+            // Compute time between scans per-station-instance (relative to previous scan at same instance).
+            // Prefer station_display_name so Assembly 1 and Assembly 2 are separated.
+            const lastSeenByStationMs = new Map();
+            const deltaByIndex = new Array(scans.length).fill('-');
+            for (let i = scans.length - 1; i >= 0; i--) {
+                const st = (scans[i].station_display_name || scans[i].station_code || '').toString();
+                const ms = parseTimestampMs(scans[i].timestamp);
+                if (!st || !Number.isFinite(ms)) continue;
+                const prev = lastSeenByStationMs.get(st);
+                if (Number.isFinite(prev)) {
+                    deltaByIndex[i] = formatDeltaMs(ms - prev);
+                }
+                lastSeenByStationMs.set(st, ms);
+            }
+
+            tbody.innerHTML = scans.map((s, i) => {
+                const ts = (s.timestamp || '').toString();
+                const { date, time } = splitTimestamp(ts);
+                const timeHtml = time
+                    ? `<span class="stacked-time"><span class="date">${date}</span><span class="time">${time}</span></span>`
+                    : `<span class="stacked-time"><span class="date">${date || ts}</span></span>`;
+                const st = (s.station_code || '').toString();
+                const stDisp = (s.station_display_name || '').toString();
+                const stLabel = (stDisp || st || '-');
+                const job = (s.job_name || '').toString();
+                const cabAsm = (s.cabinet_assembly || '').toString();
+                const roomNum = (s.room_num ?? '').toString();
+                const cabNum = (s.cabinet_num ?? '').toString();
+                const cab = (s.cabinet_name || '').toString();
+                const part = (s.part_name || '').toString();
+                const gcode = (s.gcode || '').toString();
+                const partNum = (s.part_num || '').toString();
+                const opening = (s.opening_letter || '').toString();
+                const material = (s.material || '').toString();
+                const labelSkipped = !!s.label_lookup_skipped;
+                const mz = s.label_match === true;
+                const thickness = (s.material_thickness || '').toString();
+                const length = (s.part_length || '').toString();
+                const width = (s.part_width || '').toString();
+                const edgeMat = (s.edge_material || '').toString();
+                const runName = (s.run_name || '').toString();
+                const operatorId = (s.operator_id || '').toString();
+                const raw = (s.raw_data || '').toString();
+                let pj = (s.parsed_json ?? s.parsed_fields ?? null);
+                if (typeof pj === 'string') {
+                    try { pj = JSON.parse(pj); } catch { pj = null; }
+                }
+                pj = (pj && typeof pj === 'object') ? pj : {};
+                const c1 = (pj.custom_1 || pj.custom1 || pj.Custom_1 || '').toString();
+                const c2 = (pj.custom_2 || pj.custom2 || pj.Custom_2 || '').toString();
+                const c3 = (pj.custom_3 || pj.custom3 || pj.Custom_3 || '').toString();
+                const parseMode = (s.parse_mode || pj._parse_mode || '').toString();
+                const parseWarning = (s.parse_warning || pj._parse_warning || '').toString();
+                const eventType = (pj.event_type || '').toString().toLowerCase();
+                let parseCell = formatParseCell(parseMode, parseWarning, mz, labelSkipped);
+                if (eventType === 'recut_control') {
+                    parseCell = '<span class="parse-badge" title="Recut command scan">rc</span>';
+                } else if (eventType === 'recut_part' && pj.recut_id) {
+                    parseCell = `<span class="parse-badge parse-badge-ok" title="Part logged as recut #${escHtml(String(pj.recut_id))}">rc+</span>`;
+                }
+                const issueTitle = scanIssueTitle(s);
+                let rowClass = parseWarning ? 'scan-row-error' : (scanHasIssue(s) ? 'scan-row-warn' : '');
+                if (eventType === 'recut_control') rowClass = 'scan-row-recut';
+                else if (eventType === 'recut_part') rowClass = 'scan-row-recut-part';
+                const recutBadge = formatRecutFlowBadge(pj);
+                let lblCell = '-';
+                if (scanRowIsControl(s)) {
+                    lblCell = '<span class="parse-badge" title="Control scan (bin/recut/etc.)">ctl</span>';
+                } else if (labelSkipped) {
+                    lblCell = '<span class="parse-badge" title="Enable Verify labels to check SNX/mkzlbl">…</span>';
+                } else if (mz) {
+                    lblCell = `<span class="mz-ok" title="Matched label library">✓</span>`;
+                } else if (issueTitle) {
+                    lblCell = `<span class="parse-badge parse-badge-warn" title="${escHtml(issueTitle)}">?</span>`;
+                }
+                return `
+                    <tr class="${rowClass}"${issueTitle ? ` title="${escHtml(issueTitle)}"` : ''}>
+                        <td class="nowrap mono" data-col="time">${timeHtml}</td>
+                        <td class="nowrap mono" data-col="delta">${deltaByIndex[i] || '-'}</td>
+                        <td data-col="station">${recutBadge}<span class="pill">${stLabel}</span></td>
+                        <td data-col="job">${job || '-'}</td>
+                        <td class="nowrap" data-col="cabasm">${cabAsm || '-'}</td>
+                        <td class="nowrap mono" data-col="room">${roomNum || '-'}</td>
+                        <td class="nowrap mono" data-col="cabnum">${cabNum || '-'}</td>
+                        <td data-col="cabname">${cab || '-'}</td>
+                        <td data-col="partname">${part || '-'}</td>
+                        <td class="nowrap mono" data-col="partnum">${partNum || '-'}</td>
+                        <td class="nowrap mono" data-col="opening">${opening || '-'}</td>
+                        <td data-col="material">${material || '-'}</td>
+                        <td class="nowrap" data-col="parse">${parseCell}</td>
+                        <td class="nowrap" data-col="mz">${lblCell}</td>
+                        <td class="nowrap mono" data-col="thk">${thickness || '-'}</td>
+                        <td class="nowrap mono" data-col="len">${length || '-'}</td>
+                        <td class="nowrap mono" data-col="wid">${width || '-'}</td>
+                        <td data-col="edge">${edgeMat || '-'}</td>
+                        <td data-col="run">${runName || '-'}</td>
+                        <td data-col="c1">${c1 || '-'}</td>
+                        <td data-col="c2">${c2 || '-'}</td>
+                        <td data-col="c3">${c3 || '-'}</td>
+                        <td data-col="op">${operatorId || '-'}</td>
+                        <td class="nowrap mono" data-col="gcode">${gcode || '-'}</td>
+                        <td class="mono" data-col="raw">${raw || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Ensure column visibility/widths apply to newly-rendered rows (prevents misalignment after refresh).
+            _applyColVis();
+            _applyColWidths();
+            requestAnimationFrame(() => syncScanTableScrollWidth());
+        }
+
+        // ---------------------------
+        // Column hide/show + resize (saved in this browser)
+        // ---------------------------
+        let COLS = [
+            { key: 'time', label: 'Time' },
+            { key: 'delta', label: 'Last Scan' },
+            { key: 'station', label: 'Station' },
+            { key: 'job', label: 'Job_Name' },
+            { key: 'cabasm', label: 'Cab' },
+            { key: 'room', label: 'Room' },
+            { key: 'cabnum', label: 'Cab #' },
+            { key: 'cabname', label: 'Cab_Name' },
+            { key: 'partname', label: 'Part_Name' },
+            { key: 'partnum', label: 'Part_Num' },
+            { key: 'opening', label: 'Opening_letter' },
+            { key: 'material', label: 'Part_Material' },
+            { key: 'parse', label: 'Parse' },
+            { key: 'mz', label: 'Lbl' },
+            { key: 'thk', label: 'Thk' },
+            { key: 'len', label: 'Part_Length' },
+            { key: 'wid', label: 'Part_Width' },
+            { key: 'edge', label: 'Edgeband_Info' },
+            { key: 'run', label: 'Run_Name' },
+            { key: 'c1', label: 'Custom_1' },
+            { key: 'c2', label: 'Custom_2' },
+            { key: 'c3', label: 'Custom_3' },
+            { key: 'op', label: 'Operator' },
+            { key: 'gcode', label: 'Gcode_Filename' },
+            { key: 'raw', label: 'Raw (debug)' },
+        ];
+
+        // Bump keys when defaults change so new shops get sane defaults without users having to reset manually.
+        const COL_VIS_KEY = 'innosaw_scans_col_visibility_v3';
+        const COL_VIS_KEY_LEGACY = 'innosaw_scans_col_visibility_v2';
+        const COL_W_KEY = 'innosaw_scans_col_widths_v2';
+
+        async function _loadShopScanDefaults() {
+            try {
+                const res = await fetch('/api/shop_settings');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) return null;
+                return data.scan_defaults || null;
+            } catch {
+                return null;
+            }
+        }
+
+        function _normKey(x) {
+            return (x || '').toString().trim().toLowerCase().replace(/[{}]/g, '').replace(/\s+/g, '_');
+        }
+
+        function _applyColumnLabels(scanDefaults) {
+            const d = (scanDefaults && typeof scanDefaults === 'object') ? scanDefaults : {};
+            const fl = (d.field_labels && typeof d.field_labels === 'object') ? d.field_labels : {};
+            const cl = (d.custom_labels && typeof d.custom_labels === 'object') ? d.custom_labels : {};
+
+            const getLabel = (fieldKey, fallback) => {
+                const v = (fl[fieldKey] || '').toString().trim();
+                if (v) return v;
+                // Back-compat for Custom_1/2/3 stored in custom_labels
+                if (fieldKey === 'custom_1') return ((cl.custom_1 || cl.custom1 || '').toString().trim()) || fallback;
+                if (fieldKey === 'custom_2') return ((cl.custom_2 || cl.custom2 || '').toString().trim()) || fallback;
+                if (fieldKey === 'custom_3') return ((cl.custom_3 || cl.custom3 || '').toString().trim()) || fallback;
+                return fallback;
+            };
+
+            const fieldKeyForCol = {
+                station: 'station',
+                job: 'job_name',
+                cabasm: 'cabinet_assembly',
+                room: 'room_code',
+                cabnum: 'cabinet_num',
+                cabname: 'cabinet_name',
+                partname: 'part_name',
+                partnum: 'part_num',
+                opening: 'opening_letter',
+                material: 'material',
+                thk: 'material_thickness',
+                len: 'part_length',
+                wid: 'part_width',
+                edge: 'edge_material',
+                run: 'run_name',
+                op: 'operator',
+                gcode: 'gcode',
+                raw: 'raw',
+                c1: 'custom_1',
+                c2: 'custom_2',
+                c3: 'custom_3',
+            };
+
+            // Update column list labels (panel + internal list)
+            COLS = COLS.map(c => {
+                const fk = fieldKeyForCol[c.key];
+                if (!fk) return c;
+                const fallback = c.label || fk;
+                return { ...c, label: getLabel(fk, fallback) };
+            });
+
+            // Update table headers to match (without changing data-col keys)
+            COLS.forEach(c => {
+                try {
+                    const th = document.querySelector(`th[data-col="${c.key}"]`);
+                    if (th) th.textContent = c.label;
+                } catch {}
+            });
+        }
+
+        function toggleColumnsPanel() {
+            const p = document.getElementById('columns_panel');
+            if (!p) return;
+            p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+        }
+
+        function _loadColVis() {
+            try {
+                let raw = localStorage.getItem(COL_VIS_KEY);
+                if (!raw) {
+                    const legacy = localStorage.getItem(COL_VIS_KEY_LEGACY);
+                    if (legacy) raw = legacy;
+                }
+                const vis = raw ? JSON.parse(raw) : {};
+                vis.parse = true;
+                vis.mz = true;
+                _saveColVis(vis);
+                return vis;
+            } catch {
+                const vis = { parse: true, mz: true };
+                _saveColVis(vis);
+                return vis;
+            }
+        }
+
+        function _saveColVis(v) {
+            try { localStorage.setItem(COL_VIS_KEY, JSON.stringify(v)); } catch {}
+        }
+
+        function _loadColW() {
+            try {
+                const raw = localStorage.getItem(COL_W_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch {
+                return {};
+            }
+        }
+
+        function _saveColW(v) {
+            try { localStorage.setItem(COL_W_KEY, JSON.stringify(v)); } catch {}
+        }
+
+        function _applyColVis() {
+            const vis = _loadColVis();
+            COLS.forEach(c => {
+                let hidden = vis[c.key] === false;
+                if (ALWAYS_VISIBLE_COLS.has(c.key)) hidden = false;
+                document.querySelectorAll(`[data-col="${c.key}"]`).forEach(el => {
+                    if (hidden) {
+                        el.style.display = 'none';
+                        return;
+                    }
+                    // Force table-cell to keep alignment stable (and override any CSS defaults).
+                    const tag = (el.tagName || '').toUpperCase();
+                    if (tag === 'TD' || tag === 'TH') el.style.display = 'table-cell';
+                    else el.style.display = '';
+                });
+            });
+            syncScanTableScrollWidth();
+        }
+
+        function setColVisible(key, visible) {
+            if (!visible && ALWAYS_VISIBLE_COLS.has(key)) return;
+            const vis = _loadColVis();
+            vis[key] = !!visible;
+            _saveColVis(vis);
+            _applyColVis();
+        }
+
+        function showAllColumns() {
+            const vis = {};
+            COLS.forEach(c => { vis[c.key] = true; });
+            _saveColVis(vis);
+            _applyColVis();
+            COLS.forEach(c => {
+                const cb = document.getElementById('col_cb_' + c.key);
+                if (cb) cb.checked = true;
+            });
+        }
+
+        function resetColumnWidths() {
+            _saveColW({});
+            document.querySelectorAll('th[data-col]').forEach(th => { th.style.width = ''; th.style.minWidth = ''; });
+            syncScanTableScrollWidth();
+        }
+
+        function _applyColWidths() {
+            const w = _loadColW();
+            document.querySelectorAll('th[data-col]').forEach(th => {
+                const k = th.getAttribute('data-col');
+                const px = w[k];
+                if (px) {
+                    th.style.minWidth = px + 'px';
+                    th.style.width = px + 'px';
+                }
+            });
+            syncScanTableScrollWidth();
+        }
+
+        function _installResizers() {
+            const table = getScanLogTable();
+            if (!table) return;
+            const ths = Array.from(table.querySelectorAll('thead th[data-col]'));
+            const widths = _loadColW();
+
+            ths.forEach(th => {
+                if (th.querySelector('.col-resizer')) return;
+                const r = document.createElement('div');
+                r.className = 'col-resizer';
+                th.appendChild(r);
+
+                let startX = 0;
+                let startW = 0;
+                const key = th.getAttribute('data-col') || '';
+                const onMove = (e) => {
+                    const dx = (e.clientX - startX);
+                    const nw = Math.max(30, startW + dx);
+                    th.style.width = nw + 'px';
+                    th.style.minWidth = nw + 'px';
+                    widths[key] = nw;
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    _saveColW(widths);
+                    syncScanTableScrollWidth();
+                };
+                r.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    startX = e.clientX;
+                    startW = th.getBoundingClientRect().width;
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            });
+        }
+
+        function initColumnControls(scanDefaults) {
+            const list = document.getElementById('columns_list');
+            if (!list) return;
+            let vis = _loadColVis();
+            // Compute first-time defaults (avoid overwhelming non-technical users).
+            try {
+                const hasSaved = !!localStorage.getItem(COL_VIS_KEY);
+                const isNarrow = (window.innerWidth || 0) <= 900;
+                if (!hasSaved) {
+                    const d = (scanDefaults && typeof scanDefaults === 'object') ? scanDefaults : {};
+                    const csv = (d.csv_fallback && typeof d.csv_fallback === 'object') ? d.csv_fallback : {};
+                    const cols = Array.isArray(csv.columns) ? csv.columns : [];
+                    const colSet = new Set(cols.map(_normKey));
+                    const wantsCustom = colSet.has('custom_1') || colSet.has('custom_2') || colSet.has('custom_3');
+
+                    // Base visible set for wide screens: everything except raw + custom unless used.
+                    vis = {};
+                    COLS.forEach(c => { vis[c.key] = true; });
+                    vis.raw = false; // raw should be opt-in
+                    if (!wantsCustom) {
+                        vis.c1 = false;
+                        vis.c2 = false;
+                        vis.c3 = false;
+                    }
+                    // Compact set for narrow screens (mobile)
+                    if (isNarrow) {
+                        const keep = new Set(['time','station','partname','partnum','material','parse','mz','thk','len','wid']);
+                        // If they chose custom fields, show them on mobile too (still hide raw).
+                        if (wantsCustom) { keep.add('c1'); keep.add('c2'); keep.add('c3'); }
+                        COLS.forEach(c => { vis[c.key] = keep.has(c.key); });
+                        vis.raw = false;
+                    }
+                    _saveColVis(vis);
+                }
+            } catch {
+                // ignore
+            }
+            list.innerHTML = COLS.map(c => {
+                const pinned = ALWAYS_VISIBLE_COLS.has(c.key);
+                const checked = pinned || (vis[c.key] !== false);
+                return `<label style="display:flex; gap:8px; align-items:center; font-size:13px;${pinned ? ' opacity:0.85;' : ''}">
+                    <input type="checkbox" id="col_cb_${c.key}" ${checked ? 'checked' : ''} ${pinned ? 'disabled' : ''} onchange="setColVisible('${c.key}', this.checked)">
+                    <span>${c.label}${pinned ? ' (always)' : ''}</span>
+                </label>`;
+            }).join('');
+            _applyColVis();
+            _applyColWidths();
+            _installResizers();
+        }
+
+        (function init() {
+            fixExternalLinks();
+            (async () => {
+                const scanDefaults = await _loadShopScanDefaults();
+                _applyColumnLabels(scanDefaults);
+                initColumnControls(scanDefaults);
+            })();
+
+            // Pre-fill filters from URL query params (enables drill-down links)
+            try {
+                const url = new URL(window.location.href);
+                const sp = url.searchParams;
+                const setIfPresent = (key, elId) => {
+                    const v = (sp.get(key) || '').toString();
+                    if (v && qs(elId)) qs(elId).value = v;
+                };
+
+                setIfPresent('station', 'f_station');
+                setIfPresent('station_display_name', 'f_station_display');
+                setIfPresent('job_name', 'f_job');
+                setIfPresent('cabinet_assembly', 'f_cab_asm');
+                setIfPresent('cabinet_name', 'f_cab_name');
+                setIfPresent('part_name', 'f_part_name');
+                setIfPresent('part_no', 'f_part_no');
+                setIfPresent('part_num', 'f_part_no');
+                setIfPresent('material', 'f_material');
+                setIfPresent('material_thickness', 'f_thickness');
+                setIfPresent('run_name', 'f_run');
+                setIfPresent('operator_id', 'f_operator');
+                setIfPresent('opening_letter', 'f_opening');
+                setIfPresent('date', 'f_date');
+                setIfPresent('limit', 'f_limit');
+
+                const visibleByParam = {
+                    station_display_name: 'station_display',
+                    cabinet_assembly: 'cab_asm',
+                    room_num: 'room',
+                    cabinet_num: 'cabnum',
+                    cab_type: 'cabtype',
+                    cabinet_name: 'cab_name',
+                    part_name: 'part_name',
+                    part_no: 'part_no',
+                    part_num: 'part_no',
+                    raw: 'raw',
+                    material: 'material',
+                    material_thickness: 'thickness',
+                    run_name: 'run',
+                    operator_id: 'operator',
+                    opening_letter: 'opening',
+                    date: 'date',
+                    limit: 'limit',
+                };
+                Object.entries(visibleByParam).forEach(([param, filterId]) => {
+                    if (sp.get(param)) addFilter(filterId, false);
+                });
+            } catch {
+                // ignore
+            }
+
+            // Lightweight autocomplete lists (top values)
+            Promise.all([
+                fetch('/api/autocomplete/job_name').then(r => r.json()).catch(() => ({values: []})),
+                fetch('/api/autocomplete/material').then(r => r.json()).catch(() => ({values: []})),
+                fetch('/api/autocomplete/material_thickness').then(r => r.json()).catch(() => ({values: []})),
+                fetch('/api/autocomplete/part_no').then(r => r.json()).catch(() => ({values: []})),
+                fetch('/api/autocomplete/run_name').then(r => r.json()).catch(() => ({values: []})),
+                fetch('/api/autocomplete/operator_id').then(r => r.json()).catch(() => ({values: []})),
+            ]).then(([jobs, mats, thks, partNos, runs, ops]) => {
+                const dlJobs = document.getElementById('dl_jobs');
+                const dlMats = document.getElementById('dl_materials');
+                const dlThk = document.getElementById('dl_thickness');
+                const dlPartNumbers = document.getElementById('dl_part_numbers');
+                const dlRuns = document.getElementById('dl_runs');
+                const dlOps = document.getElementById('dl_operators');
+                if (dlJobs) dlJobs.innerHTML = (jobs.values || []).map(v => `<option value="${v}"></option>`).join('');
+                if (dlMats) dlMats.innerHTML = (mats.values || []).map(v => `<option value="${v}"></option>`).join('');
+                if (dlThk) dlThk.innerHTML = (thks.values || []).map(v => `<option value="${v}"></option>`).join('');
+                if (dlPartNumbers) dlPartNumbers.innerHTML = (partNos.values || []).map(v => `<option value="${v}"></option>`).join('');
+                if (dlRuns) dlRuns.innerHTML = (runs.values || []).map(v => `<option value="${v}"></option>`).join('');
+                if (dlOps) dlOps.innerHTML = (ops.values || []).map(v => `<option value="${v}"></option>`).join('');
+            });
+
+            // Auto-refresh controls
+            qs('auto_refresh')?.addEventListener('change', _startAutoRefresh);
+            qs('refresh_interval')?.addEventListener('change', _startAutoRefresh);
+
+        })();
+    </script>
+    <script src="/static/searchable-select.js?v=20260116"></script>
+    <script src="/static/contextual-help.js?v=20260118b"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP - Innosaw</title>
+    <link rel="stylesheet" href="/static/common.css?v=20251223">
+    <script src="/static/theme.js?v=20260416a"></script>
+    <link rel="stylesheet" href="/static/mobile-nav.css?v=20260118">
+    <script src="/static/mobile-nav.js?v=20260118"></script>
+    <style>
+        .sop-grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+        .sop-list { max-height: 72vh; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; }
+        .sop-item { padding: 10px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .sop-item:last-child { border-bottom: none; }
+        .sop-item.active { background: var(--bg-tertiary); }
+        .sop-item-title { font-weight: 700; color: var(--text-primary); }
+        .sop-item-meta { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+        .row-gap { display: grid; gap: 10px; }
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .toolbar { display: flex; gap: 6px; flex-wrap: wrap; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; background: var(--bg-secondary); }
+        .toolbar .btn { padding: 6px 10px; }
+        .toolbar .sep { width: 1px; align-self: stretch; background: var(--border-color); margin: 0 2px; }
+        .input, .textarea { width: 100%; border: 1px solid var(--input-border); border-radius: 8px; padding: 8px 10px; background: var(--input-bg); color: var(--text-primary); }
+        .textarea { min-height: 80px; resize: vertical; }
+        .muted { color: var(--text-secondary); font-size: 12px; }
+        .station-picker-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+        .station-picker-remove { min-width: 72px; }
+
+        .editor-shell {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--card-bg);
+            overflow: hidden;
+        }
+        .editor-shell.preview-mode {
+            border-color: var(--border-color);
+            box-shadow: inset 0 0 0 1px var(--border-color);
+        }
+        .editor-shell.preview-mode .editor {
+            background: var(--card-bg);
+        }
+        .editor-shell.preview-mode .sop-block-controls,
+        .editor-shell.preview-mode .sop-resize-handle,
+        .editor-shell.preview-mode .sop-group-chip {
+            display: none !important;
+        }
+        .editor {
+            width: 100%;
+            min-height: 460px;
+            padding: 14px;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            overflow: auto;
+            background: var(--bg-secondary);
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 10px;
+            align-content: start;
+            align-items: start;
+        }
+        .editor:focus { outline: 2px solid #93c5fd; outline-offset: 1px; }
+
+        .sop-block {
+            position: relative;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--card-bg);
+            padding: 14px 14px 12px;
+            margin-bottom: 0;
+            box-shadow: 0 1px 3px var(--card-shadow);
+            grid-column: span 12;
+            align-self: start;
+            min-height: 120px;
+            width: 100%;
+        }
+        .sop-block.grouped {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.14), 0 1px 3px rgba(15, 23, 42, 0.06);
+        }
+        .sop-block.drag-over {
+            outline: 2px dashed #2563eb;
+            outline-offset: 1px;
+        }
+        .sop-block-controls {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            z-index: 8;
+        }
+        .sop-block-btn {
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border-radius: 6px;
+            min-width: 30px;
+            height: 26px;
+            font-size: 12px;
+            line-height: 1;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .sop-block-btn:hover { background: var(--bg-tertiary); border-color: #93c5fd; }
+        .sop-drag-handle { cursor: grab; font-weight: 700; }
+        .sop-size-chip {
+            min-width: 30px;
+            height: 24px;
+            font-size: 11px;
+            padding: 0 6px;
+        }
+        .sop-group-chip {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 8;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid #c4b5fd;
+            background: color-mix(in srgb, #5b21b6 15%, var(--card-bg) 85%);
+            color: #a78bfa;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .sop-resize-handle {
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            z-index: 8;
+            border-radius: 3px;
+            background: linear-gradient(135deg, transparent 50%, rgba(30, 64, 175, 0.85) 50%);
+        }
+        .sop-resize-handle:hover {
+            background: linear-gradient(135deg, transparent 50%, rgba(30, 64, 175, 1) 50%);
+        }
+
+        .sop-section {
+            border-left: 6px solid var(--section-color, #3b82f6);
+            background: var(--card-bg);
+            padding-top: 34px;
+        }
+        .sop-section.sop-section-clean {
+            border-left: 0;
+            padding-left: 14px;
+        }
+        .sop-section.sop-section-clean .sop-section-color-row {
+            display: none;
+        }
+        .sop-section-color-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .section-color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.2);
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .sop-logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-top: 34px;
+        }
+        .sop-logo {
+            max-height: 72px;
+            max-width: 220px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+        }
+        .sop-block ul,
+        .sop-block ol {
+            list-style-position: inside;
+            padding-left: 0;
+            margin: 0.35rem 0;
+        }
+
+        .annotation-overlay { position: relative; display: inline-block; max-width: 100%; }
+        .annotation-overlay .screenshot { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+        .annotation-badge {
+            position: absolute;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            background: #1976d2;
+            color: #fff;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 5;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            user-select: none;
+        }
+        .annotation-badge .annot-drag { cursor: move; font-size: 12px; opacity: 0.9; margin-right: 2px; }
+        .annotation-badge .annot-delete {
+            margin-left: 2px;
+            padding: 0 4px;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.32);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .annotation-badge .annot-num { min-width: 8px; text-align: center; }
+        .annotation-badge.is-selected {
+            outline: 2px solid #f59e0b;
+            outline-offset: 1px;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (max-width: 980px) {
+            .sop-grid { grid-template-columns: 1fr; }
+            .sop-list { max-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📘 SOP</h1>
+        <div class="subtitle">Create and manage internal standard operating procedures in cloud V2</div>
+        <div class="nav_primary">
+            <a class="nav_btn" href="/">Dashboard</a>
+            <a class="nav_btn" href="/reports">Reports</a>
+            <a id="shop_link" class="nav_btn" href="/">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/admin">Admin</a>
+            <a class="nav_btn" href="/help">Help</a>
+            <a class="nav_btn active" href="/sop">SOP</a>
+            <a class="nav_btn ext-link" data-port="5000" data-path="/" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <a class="nav_btn" href="/login">Login</a>
+        </div>
+    </div>
+    <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/mobile">Mobile Scan</a>
+        <a class="nav_btn" href="/maintenance">Maintenance</a>
+        <a class="nav_btn" href="/inventory">Inventory</a>
+        <a class="nav_btn" href="/tools">Tools</a>
+        <a class="nav_btn" href="/recuts">Recuts</a>
+    </div>
+
+    <div class="container">
+        <div class="sop-grid">
+            <div class="card row-gap">
+                <div class="btn-row">
+                    <button class="btn" type="button" onclick="newDoc()">+ New SOP</button>
+                    <button class="btn btn-secondary" type="button" onclick="reloadDocs()">Refresh</button>
+                </div>
+                <div id="sop_list" class="sop-list"></div>
+            </div>
+
+            <div class="card row-gap">
+                <div>
+                    <label for="doc_title"><strong>Title</strong></label>
+                    <input id="doc_title" class="input" type="text" maxlength="160" placeholder="SOP title">
+                </div>
+                <div>
+                    <label for="doc_source"><strong>Source / Folder Path</strong></label>
+                    <input id="doc_source" class="input" type="text" maxlength="260" placeholder="e.g. Office/SOP/CNC">
+                </div>
+                <div>
+                    <label for="doc_tags"><strong>Tags (comma separated)</strong></label>
+                    <input id="doc_tags" class="input" type="text" placeholder="safety, edge, dowel">
+                </div>
+                <div>
+                    <label for="doc_stations_picker"><strong>Linked Stations</strong></label>
+                    <div id="doc_stations_picker" class="row-gap"></div>
+                    <input id="doc_stations" type="hidden" value="">
+                    <div class="muted">Pick stations from the list. Selecting one adds the next slot automatically.</div>
+                </div>
+                <div>
+                    <label><strong>SOP Builder</strong></label>
+                    <div class="toolbar">
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('bold')"><strong>B</strong></button>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('italic')"><em>I</em></button>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('underline')"><u>U</u></button>
+                        <span class="sep"></span>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('formatBlock','H2')">H2</button>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('formatBlock','H3')">H3</button>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('formatBlock','P')">P</button>
+                        <span class="sep"></span>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('insertUnorderedList')">• List</button>
+                        <button class="btn btn-secondary" type="button" onclick="formatCmd('insertOrderedList')">1. List</button>
+                        <button class="btn btn-secondary" type="button" onclick="insertLink()">Link</button>
+                        <button class="btn btn-secondary" type="button" onclick="embedImage()">Image</button>
+                        <span class="sep"></span>
+                        <button class="btn btn-secondary" type="button" onclick="insertSection('purpose')">Purpose</button>
+                        <button class="btn btn-secondary" type="button" onclick="insertSection('steps')">Steps</button>
+                        <button class="btn btn-secondary" type="button" onclick="insertSection('safety')">Safety</button>
+                    </div>
+                    <div class="editor-shell">
+                        <div id="doc_html" class="editor" contenteditable="true"></div>
+                    </div>
+                    <input id="image_picker" type="file" accept="image/*" style="display:none" onchange="onImagePicked(event)">
+                    <input id="sop_import_picker" type="file" accept="application/json,.json" style="display:none" onchange="onSopFilePicked(event)">
+                </div>
+                <div class="btn-row">
+                    <button class="btn" type="button" onclick="saveDoc()">Save</button>
+                    <button class="btn btn-danger" type="button" onclick="deleteDoc()">Delete</button>
+                </div>
+                <div id="status" class="muted">No document selected.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let docs = [];
+        let activeId = null;
+        let imageInsertMode = 'inline';
+        let pendingImageTargetId = null;
+        let dragBlock = null;
+        let dragGroupBlocks = [];
+        let annotIdCounter = 0;
+        let annotationSnapEnabled = true;
+        let annotationSnapStep = 1;
+        let activeAnnotationBadge = null;
+        let previewModeEnabled = false;
+        let stationOptions = [];
+        let stationPickerRows = [''];
+        let requestedDocId = null;
+        const SOP_FILE_SCHEMA_VERSION = 2;
+        const SOP_FILE_MAX_SUPPORTED_VERSION = 2;
+
+        (function initRequestedDocId() {
+            try {
+                const q = new URLSearchParams(window.location.search || '');
+                requestedDocId = String(q.get('doc_id') || q.get('sop_id') || '').trim() || null;
+            } catch {
+                requestedDocId = null;
+            }
+        })();
+
+        function escapeHtml(s) {
+            return String(s || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getEditor() {
+            return document.getElementById('doc_html');
+        }
+
+        function getEditorShell() {
+            return document.querySelector('.editor-shell');
+        }
+
+        function focusEditor() {
+            const editor = getEditor();
+            if (editor) editor.focus();
+        }
+
+        function formatCmd(command, value = null) {
+            focusEditor();
+            document.execCommand(command, false, value);
+        }
+
+        function setPreviewMode(enabled) {
+            previewModeEnabled = !!enabled;
+            const shell = getEditorShell();
+            const editor = getEditor();
+            const btn = document.getElementById('preview_mode_btn');
+            if (shell) shell.classList.toggle('preview-mode', previewModeEnabled);
+            if (editor) editor.setAttribute('contenteditable', previewModeEnabled ? 'false' : 'true');
+            if (btn) btn.textContent = previewModeEnabled ? 'Preview: On' : 'Preview: Off';
+            setStatus(previewModeEnabled ? 'Preview mode enabled.' : 'Preview mode disabled.');
+        }
+
+        function togglePreviewMode() {
+            setPreviewMode(!previewModeEnabled);
+        }
+
+        function insertHtml(html) {
+            focusEditor();
+            document.execCommand('insertHTML', false, html);
+        }
+
+        function insertLink() {
+            const url = prompt('Paste URL');
+            if (!url) return;
+            const safeUrl = String(url).trim();
+            if (!safeUrl) return;
+            const selected = window.getSelection && window.getSelection().toString();
+            const label = selected || safeUrl;
+            insertHtml(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`);
+        }
+
+        function pickImage(mode, targetId = null) {
+            imageInsertMode = mode || 'inline';
+            pendingImageTargetId = targetId;
+            const picker = document.getElementById('image_picker');
+            if (picker) picker.click();
+        }
+
+        function embedImage() {
+            pickImage('inline');
+        }
+
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.onerror = () => reject(reader.error || new Error('Failed to read image'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadImageFromSrc(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Invalid image data'));
+                img.src = src;
+            });
+        }
+
+        function dataUrlByteSize(dataUrl) {
+            const base64 = String(dataUrl || '').split(',')[1] || '';
+            return Math.floor((base64.length * 3) / 4);
+        }
+
+        async function optimizeImageForEmbed(file) {
+            const original = await readFileAsDataUrl(file);
+            const originalBytes = dataUrlByteSize(original);
+            const targetBytes = 850_000;
+            if (originalBytes <= targetBytes) return original;
+
+            const img = await loadImageFromSrc(original);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return original;
+
+            let width = img.naturalWidth || img.width || 1;
+            let height = img.naturalHeight || img.height || 1;
+            const maxDimension = 2400;
+            const scale0 = Math.min(1, maxDimension / Math.max(width, height));
+            width = Math.max(1, Math.round(width * scale0));
+            height = Math.max(1, Math.round(height * scale0));
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const preferredMime = String(file.type || '').toLowerCase() === 'image/png' ? 'image/webp' : 'image/jpeg';
+            const qualitySteps = [0.92, 0.88, 0.84, 0.80, 0.76];
+            let best = original;
+
+            for (const q of qualitySteps) {
+                const candidate = canvas.toDataURL(preferredMime, q);
+                if (dataUrlByteSize(candidate) < dataUrlByteSize(best)) best = candidate;
+                if (dataUrlByteSize(candidate) <= targetBytes) return candidate;
+            }
+
+            for (let i = 0; i < 3; i += 1) {
+                width = Math.max(1, Math.round(width * 0.88));
+                height = Math.max(1, Math.round(height * 0.88));
+                canvas.width = width;
+                canvas.height = height;
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                const candidate = canvas.toDataURL(preferredMime, 0.82);
+                if (dataUrlByteSize(candidate) < dataUrlByteSize(best)) best = candidate;
+                if (dataUrlByteSize(candidate) <= targetBytes) return candidate;
+            }
+
+            return best;
+        }
+
+        async function onImagePicked(event) {
+            const file = event.target && event.target.files ? event.target.files[0] : null;
+            if (!file) return;
+            try {
+                setStatus('Optimizing image...');
+                const src = await optimizeImageForEmbed(file);
+                if (!src) return;
+                if (imageInsertMode === 'logo') {
+                    setLogoImage(src, pendingImageTargetId);
+                } else if (imageInsertMode === 'annotated') {
+                    insertAnnotatedImageBlock(src);
+                } else {
+                    insertHtml(`<p><img src="${src}" alt="SOP image" style="max-width:100%;height:auto;border-radius:6px;"></p>`);
+                }
+                setStatus('Image added.');
+            } catch (err) {
+                setStatus('Image add failed: ' + (err && err.message ? err.message : err));
+            } finally {
+                imageInsertMode = 'inline';
+                pendingImageTargetId = null;
+                event.target.value = '';
+            }
+        }
+
+        function normalizeStationCode(value) {
+            return String(value || '').trim();
+        }
+
+        function syncStationsHiddenInput() {
+            const hidden = document.getElementById('doc_stations');
+            if (hidden) hidden.value = getStationsFromPicker().join(', ');
+        }
+
+        function ensureTrailingEmptyStationRow() {
+            const cleaned = stationPickerRows.map(normalizeStationCode).filter(Boolean);
+            stationPickerRows = [...cleaned, ''];
+        }
+
+        function getStationsFromPicker() {
+            const seen = new Set();
+            const out = [];
+            stationPickerRows.forEach((raw) => {
+                const code = normalizeStationCode(raw);
+                if (!code) return;
+                const key = code.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                out.push(code);
+            });
+            return out;
+        }
+
+        function setStationsPickerFromList(values) {
+            const unique = [];
+            const seen = new Set();
+            (Array.isArray(values) ? values : []).forEach((raw) => {
+                const code = normalizeStationCode(raw);
+                if (!code) return;
+                const key = code.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                unique.push(code);
+            });
+            stationPickerRows = [...unique, ''];
+            renderStationsPicker();
+        }
+
+        function renderStationsPicker() {
+            const wrap = document.getElementById('doc_stations_picker');
+            if (!wrap) return;
+            ensureTrailingEmptyStationRow();
+            wrap.innerHTML = '';
+
+            stationPickerRows.forEach((selectedCode, idx) => {
+                const row = document.createElement('div');
+                row.className = 'station-picker-row';
+
+                const select = document.createElement('select');
+                select.className = 'input';
+                const blank = document.createElement('option');
+                blank.value = '';
+                blank.textContent = idx === stationPickerRows.length - 1 ? 'Select station...' : '(none)';
+                select.appendChild(blank);
+
+                stationOptions.forEach((opt) => {
+                    const option = document.createElement('option');
+                    option.value = opt.code;
+                    option.textContent = opt.label;
+                    select.appendChild(option);
+                });
+
+                const normalized = normalizeStationCode(selectedCode);
+                if (normalized && !stationOptions.some((opt) => String(opt.code).toLowerCase() === normalized.toLowerCase())) {
+                    const extra = document.createElement('option');
+                    extra.value = normalized;
+                    extra.textContent = normalized + ' (not in current stations)';
+                    select.appendChild(extra);
+                }
+                select.value = normalized;
+                select.onchange = () => {
+                    stationPickerRows[idx] = normalizeStationCode(select.value);
+                    renderStationsPicker();
+                };
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-secondary station-picker-remove';
+                remove.textContent = 'Remove';
+                remove.disabled = !normalized && stationPickerRows.length <= 1;
+                remove.onclick = () => {
+                    stationPickerRows.splice(idx, 1);
+                    renderStationsPicker();
+                };
+
+                row.appendChild(select);
+                row.appendChild(remove);
+                wrap.appendChild(row);
+            });
+
+            syncStationsHiddenInput();
+        }
+
+        async function loadStationOptions() {
+            try {
+                const res = await fetch('/api/stations');
+                const data = await res.json().catch(() => ({}));
+                const rows = Array.isArray(data && data.stations) ? data.stations : [];
+                stationOptions = rows
+                    .map((s) => {
+                        const code = normalizeStationCode(s && s.station_code);
+                        const labelName = normalizeStationCode(s && (s.display_name || s.station_code));
+                        return code ? { code, label: labelName || code } : null;
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+            } catch {
+                stationOptions = [];
+            }
+            renderStationsPicker();
+        }
+
+        function insertSection(kind) {
+            if (kind === 'purpose') {
+                addSectionBlock('Purpose', '#2563eb', '<p>Describe why this SOP exists.</p>');
+                return;
+            }
+            if (kind === 'steps') {
+                addSectionBlock('Procedure', '#0d9488', '<ol><li>Step 1</li><li>Step 2</li><li>Step 3</li></ol>');
+                return;
+            }
+            if (kind === 'safety') {
+                addSectionBlock('Safety Notes', '#dc2626', '<ul><li>PPE required</li><li>Lockout/tagout where applicable</li></ul>');
+                return;
+            }
+            if (kind === 'clean') {
+                addSectionBlock('Header / Notes', '#2563eb', '<p>Clean section without color border.</p>', true);
+            }
+        }
+
+        function generateBlockId() {
+            return 'sop_block_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        }
+
+        function generateGroupId() {
+            return 'grp_' + Math.random().toString(36).slice(2, 7);
+        }
+
+        function nextAnnotId() {
+            annotIdCounter += 1;
+            return 'annot_' + annotIdCounter;
+        }
+
+        function snapPct(value) {
+            if (!annotationSnapEnabled) return value;
+            const step = Math.max(0.25, Number(annotationSnapStep) || 1);
+            return Math.round(value / step) * step;
+        }
+
+        function clampPct(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return 0;
+            return Math.max(0, Math.min(100, n));
+        }
+
+        function setActiveAnnotationBadge(badge) {
+            if (activeAnnotationBadge && activeAnnotationBadge !== badge) {
+                activeAnnotationBadge.classList.remove('is-selected');
+            }
+            activeAnnotationBadge = badge || null;
+            if (activeAnnotationBadge) activeAnnotationBadge.classList.add('is-selected');
+        }
+
+        function nudgeActiveAnnotation(key, multiplier = 1) {
+            const badge = activeAnnotationBadge;
+            if (!badge) return;
+            const step = (annotationSnapEnabled ? Math.max(0.25, Number(annotationSnapStep) || 1) : 0.25) * Math.max(1, multiplier || 1);
+            let left = parseFloat(badge.style.left || '0');
+            let top = parseFloat(badge.style.top || '0');
+
+            if (key === 'ArrowLeft') left -= step;
+            if (key === 'ArrowRight') left += step;
+            if (key === 'ArrowUp') top -= step;
+            if (key === 'ArrowDown') top += step;
+
+            left = clampPct(annotationSnapEnabled ? snapPct(left) : left);
+            top = clampPct(annotationSnapEnabled ? snapPct(top) : top);
+            badge.style.left = left.toFixed(2) + '%';
+            badge.style.top = top.toFixed(2) + '%';
+        }
+
+        function setupAnnotationKeyboardNudge() {
+            if (document.body.dataset.annotationNudgeReady === '1') return;
+            document.body.dataset.annotationNudgeReady = '1';
+            document.addEventListener('keydown', (e) => {
+                if (!activeAnnotationBadge) return;
+                if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+
+                const target = e.target;
+                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+                e.preventDefault();
+                nudgeActiveAnnotation(e.key, e.shiftKey ? 5 : 1);
+            });
+        }
+
+        function getCurrentDocPayload() {
+            return {
+                title: document.getElementById('doc_title').value || 'Untitled SOP',
+                source_path: document.getElementById('doc_source').value || '',
+                tags: parseCsv(document.getElementById('doc_tags').value),
+                linked_stations: getStationsFromPicker(),
+                content_html: cleanEditorHtmlForSave()
+            };
+        }
+
+        function safeFileName(name, fallback) {
+            const cleaned = String(name || '').trim().replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_');
+            return cleaned || fallback;
+        }
+
+        function normalizeStringArray(value) {
+            if (Array.isArray(value)) {
+                return value.map((v) => String(v || '').trim()).filter(Boolean);
+            }
+            if (typeof value === 'string') {
+                return parseCsv(value);
+            }
+            return [];
+        }
+
+        function normalizeImportedSopDocument(parsed) {
+            if (!parsed || typeof parsed !== 'object') throw new Error('Invalid SOP file format');
+
+            const format = String(parsed.format || '').trim();
+            let schemaVersion = Number(parsed.schema_version || parsed.version || 0);
+
+            if (!schemaVersion && format === 'innosaw-sop-v1') schemaVersion = 1;
+            if (!schemaVersion && format === 'innosaw-sop') schemaVersion = 2;
+            if (!schemaVersion) schemaVersion = 1;
+
+            if (schemaVersion > SOP_FILE_MAX_SUPPORTED_VERSION) {
+                throw new Error('This SOP file uses schema v' + schemaVersion + ', but this editor supports up to v' + SOP_FILE_MAX_SUPPORTED_VERSION + '. Please update the app first.');
+            }
+
+            const rawDoc = parsed.doc && typeof parsed.doc === 'object' ? parsed.doc : parsed;
+            if (!rawDoc || typeof rawDoc !== 'object') throw new Error('Invalid SOP document payload');
+
+            const normalizedDoc = {
+                title: String(rawDoc.title || rawDoc.name || ''),
+                source_path: String(rawDoc.source_path || rawDoc.source || rawDoc.folder_path || ''),
+                tags: normalizeStringArray(rawDoc.tags || rawDoc.tags_csv),
+                linked_stations: normalizeStringArray(rawDoc.linked_stations || rawDoc.stations || rawDoc.station_ids),
+                content_html: String(rawDoc.content_html || rawDoc.html || rawDoc.content || defaultSopTemplate())
+            };
+
+            return { schemaVersion, doc: normalizedDoc };
+        }
+
+        async function loadHtml2PdfScript() {
+            if (typeof html2pdf !== 'undefined') return;
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load PDF export library'));
+                document.head.appendChild(script);
+            });
+        }
+
+        async function exportPdf() {
+            const payload = getCurrentDocPayload();
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:900px;background:#fff;padding:20px;font-family:Arial,sans-serif;color:#111;';
+            wrapper.innerHTML = [
+                '<h1 style="margin:0 0 8px 0;">' + escapeHtml(payload.title || 'SOP') + '</h1>',
+                '<p style="margin:0 0 16px 0;color:var(--text-secondary);font-size:12px;">Exported ' + new Date().toLocaleString() + '</p>',
+                payload.content_html || '<p>No content.</p>'
+            ].join('');
+            document.body.appendChild(wrapper);
+
+            try {
+                await loadHtml2PdfScript();
+                const fileName = safeFileName(payload.title, 'SOP') + '.pdf';
+                await html2pdf().set({
+                    margin: 10,
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(wrapper).save();
+                setStatus('PDF exported: ' + fileName);
+            } catch (err) {
+                setStatus('PDF export failed: ' + (err && err.message ? err.message : err));
+            } finally {
+                wrapper.remove();
+            }
+        }
+
+        function exportSopFile() {
+            const payload = getCurrentDocPayload();
+            const exportObj = {
+                format: 'innosaw-sop',
+                schema_version: SOP_FILE_SCHEMA_VERSION,
+                exported_at: new Date().toISOString(),
+                doc: payload
+            };
+            const name = safeFileName(payload.title, 'SOP') + '.sop.json';
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            setStatus('SOP exported: ' + name);
+        }
+
+        function importSopFile() {
+            const picker = document.getElementById('sop_import_picker');
+            if (picker) picker.click();
+        }
+
+        function onSopFilePicked(event) {
+            const file = event.target && event.target.files ? event.target.files[0] : null;
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const raw = String(reader.result || '');
+                    const parsed = JSON.parse(raw);
+                    const normalized = normalizeImportedSopDocument(parsed);
+                    const doc = normalized.doc;
+
+                    activeId = null;
+                    document.getElementById('doc_title').value = String(doc.title || '');
+                    document.getElementById('doc_source').value = String(doc.source_path || '');
+                    document.getElementById('doc_tags').value = Array.isArray(doc.tags) ? doc.tags.join(', ') : '';
+                    setStationsPickerFromList(Array.isArray(doc.linked_stations) ? doc.linked_stations : []);
+                    getEditor().innerHTML = String(doc.content_html || defaultSopTemplate());
+                    enhanceBuilderEditor();
+                    renderList();
+                    setStatus('SOP imported (schema v' + normalized.schemaVersion + ') as draft. Click Save to store it.');
+                } catch (err) {
+                    setStatus('Import failed: ' + (err && err.message ? err.message : err));
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function applyBlockLayout(block, span = null, minHeight = null) {
+            if (!block) return;
+            const nextSpan = span || Number(block.dataset.colSpan || 12) || 12;
+            const rawHeight = minHeight !== null ? minHeight : (block.dataset.minHeight || 120);
+            const nextHeight = String(rawHeight).toLowerCase() === 'auto' ? 'auto' : (Number(rawHeight) || 120);
+            block.dataset.colSpan = String(nextSpan);
+            block.dataset.minHeight = String(nextHeight);
+            block.style.gridColumn = 'span ' + nextSpan;
+            block.style.minHeight = nextHeight === 'auto' ? '0px' : (nextHeight + 'px');
+            block.style.height = nextHeight === 'auto' ? 'auto' : '';
+            const manualWidthPx = Number(block.dataset.manualWidthPx || 0);
+            block.style.width = manualWidthPx > 0 ? (manualWidthPx + 'px') : '100%';
+        }
+
+        function applyGroupVisual(block) {
+            if (!block) return;
+            const groupId = String(block.dataset.groupId || '').trim();
+            const existing = block.querySelector('.sop-group-chip');
+            if (!groupId) {
+                block.classList.remove('grouped');
+                if (existing) existing.remove();
+                return;
+            }
+            block.classList.add('grouped');
+            const chip = existing || document.createElement('span');
+            chip.className = 'sop-group-chip';
+            chip.setAttribute('contenteditable', 'false');
+            chip.textContent = 'Group ' + groupId.replace(/^grp_/, '').toUpperCase();
+            if (!existing) block.appendChild(chip);
+        }
+
+        function assignBlockGroup(block) {
+            if (!block) return;
+            const current = String(block.dataset.groupId || '').trim();
+            const proposed = current || generateGroupId();
+            const raw = prompt('Group name/id (use the same value on multiple blocks to move them together):', proposed);
+            if (raw === null) return;
+            const normalized = String(raw || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24);
+            if (!normalized) {
+                setStatus('Group value cannot be empty.');
+                return;
+            }
+            block.dataset.groupId = normalized;
+            applyGroupVisual(block);
+            setStatus('Block grouped as ' + normalized + '.');
+        }
+
+        function clearBlockGroup(block) {
+            if (!block) return;
+            delete block.dataset.groupId;
+            applyGroupVisual(block);
+            setStatus('Block removed from group.');
+        }
+
+        function getGroupedBlocks(block) {
+            const editor = getEditor();
+            if (!block || !editor) return [];
+            const groupId = String(block.dataset.groupId || '').trim();
+            if (!groupId) return [block];
+            const grouped = Array.from(editor.querySelectorAll('.sop-block')).filter((el) => String(el.dataset.groupId || '').trim() === groupId);
+            return grouped.length ? grouped : [block];
+        }
+
+        function setupBlockResizeHandle(block) {
+            if (!block || block.dataset.resizeSetup === '1') return;
+            block.dataset.resizeSetup = '1';
+            const handle = document.createElement('div');
+            handle.className = 'sop-resize-handle';
+            handle.title = 'Drag to fine tune block width and height';
+            handle.setAttribute('contenteditable', 'false');
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const editor = getEditor();
+                const style = window.getComputedStyle(editor);
+                const gap = parseFloat(style.columnGap || style.gap || '10') || 10;
+                const span = Number(block.dataset.colSpan || 12) || 12;
+                const editorWidth = Math.max(220, editor.clientWidth - 28);
+                const spanWidth = ((editorWidth - (11 * gap)) / 12) * span + ((span - 1) * gap);
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startWidth = block.getBoundingClientRect().width;
+                const startHeight = Math.max(90, block.getBoundingClientRect().height);
+
+                const onMove = (ev) => {
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+                    const nextWidth = Math.max(180, Math.min(spanWidth, startWidth + dx));
+                    const nextHeight = Math.max(90, startHeight + dy);
+                    block.dataset.manualWidthPx = String(Math.round(nextWidth));
+                    block.style.width = Math.round(nextWidth) + 'px';
+                    block.dataset.minHeight = String(Math.round(nextHeight));
+                    block.style.minHeight = Math.round(nextHeight) + 'px';
+                    block.style.height = '';
+                };
+
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+            block.appendChild(handle);
+        }
+
+        function addSectionBlock(title, color, innerHtml, clean = false) {
+            const editor = getEditor();
+            const block = document.createElement('div');
+            block.className = 'sop-block sop-section';
+            block.dataset.blockId = generateBlockId();
+            if (clean) block.classList.add('sop-section-clean');
+            block.style.setProperty('--section-color', color || '#2563eb');
+            block.innerHTML = `
+                <div class="sop-section-color-row" contenteditable="false">
+                    <span style="font-size:12px;color:var(--text-secondary)">Section color</span>
+                    <span class="section-color-dot" data-color="#2563eb" style="background:#2563eb"></span>
+                    <span class="section-color-dot" data-color="#0d9488" style="background:#0d9488"></span>
+                    <span class="section-color-dot" data-color="#7c3aed" style="background:#7c3aed"></span>
+                    <span class="section-color-dot" data-color="#dc2626" style="background:#dc2626"></span>
+                    <span class="section-color-dot" data-color="#ea580c" style="background:#ea580c"></span>
+                </div>
+                <h2>${escapeHtml(title || 'New Section')}</h2>
+                ${innerHtml || '<p>Add content here.</p>'}
+            `;
+            editor.appendChild(block);
+            enhanceBuilderEditor();
+            block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function addElementBlock() {
+            const editor = getEditor();
+            const block = document.createElement('div');
+            block.className = 'sop-block';
+            block.dataset.blockId = generateBlockId();
+            block.innerHTML = '<h3>Element</h3><p><strong>Name:</strong> New element</p><p><strong>Description:</strong> Describe this element and expected behavior.</p>';
+            editor.appendChild(block);
+            enhanceBuilderEditor();
+            block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function addLogoBlock() {
+            const editor = getEditor();
+            const block = document.createElement('div');
+            const blockId = generateBlockId();
+            block.className = 'sop-block sop-logo-wrap';
+            block.dataset.blockId = blockId;
+            block.innerHTML = `
+                <img class="sop-logo" src="" alt="Logo" style="display:none;">
+                <div>
+                    <h2 style="margin:0 0 6px 0;">SOP Header</h2>
+                    <p style="margin:0;">Click Upload Logo in this block to add your company logo.</p>
+                </div>
+            `;
+            editor.prepend(block);
+            enhanceBuilderEditor();
+            pickImage('logo', blockId);
+        }
+
+        function setLogoImage(src, blockId) {
+            const editor = getEditor();
+            let block = null;
+            if (blockId) {
+                block = Array.from(editor.querySelectorAll('.sop-logo-wrap')).find((el) => String(el.dataset.blockId || '') === String(blockId));
+            }
+            if (!block) block = editor.querySelector('.sop-logo-wrap');
+            if (!block) return;
+            const img = block.querySelector('.sop-logo');
+            if (!img) return;
+            img.src = src;
+            img.style.display = 'block';
+        }
+
+        function insertAnnotatedImageBlock(src) {
+            const editor = getEditor();
+            const block = document.createElement('div');
+            block.className = 'sop-block sop-annotated-image';
+            block.dataset.blockId = generateBlockId();
+            block.innerHTML = `
+                <h3>Annotated Image</h3>
+                <div class="annotation-overlay">
+                    <img class="screenshot" src="${escapeHtml(src)}" alt="Annotated SOP image">
+                </div>
+            `;
+            editor.appendChild(block);
+            enhanceBuilderEditor();
+            addAnnotationToBlock(block);
+            block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function addAnnotatedImage() {
+            pickImage('annotated');
+        }
+
+        function addAnnotationToBlock(block) {
+            if (!block) return;
+            const overlay = block.querySelector('.annotation-overlay');
+            if (!overlay) return;
+            const existing = Array.from(overlay.querySelectorAll('.annotation-badge'));
+            const count = existing.length;
+            const index = count;
+            const col = index % 4;
+            const row = Math.floor(index / 4);
+            const x = Math.min(82, 8 + (col * 20));
+            const y = Math.min(82, 12 + (row * 18));
+            const badge = document.createElement('span');
+            badge.className = 'annotation-badge';
+            badge.dataset.annotId = nextAnnotId();
+            badge.style.left = x + '%';
+            badge.style.top = y + '%';
+            badge.innerHTML = '<span class="annot-drag">⋮</span><span class="annot-num" contenteditable="true">' + String(count + 1) + '</span><span class="annot-delete">×</span>';
+            overlay.appendChild(badge);
+            normalizeAnnotationNumbers(overlay, false);
+            setupAnnotationBadgeDrag(badge, overlay);
+        }
+
+        function duplicateBlock(block) {
+            if (!block || !block.parentElement) return;
+            const clone = block.cloneNode(true);
+            clone.dataset.blockId = generateBlockId();
+            clone.dataset.blockSetup = '';
+            clone.dataset.resizeSetup = '';
+            clone.style.opacity = '1';
+            clone.classList.remove('drag-over', 'dragging');
+
+            clone.querySelectorAll('.sop-block-controls, .sop-resize-handle, .sop-group-chip').forEach((el) => el.remove());
+
+            clone.querySelectorAll('.annotation-badge').forEach((badge, idx) => {
+                badge.dataset.annotId = nextAnnotId();
+                if (!badge.style.left || !badge.style.top) {
+                    const fallbackX = Math.min(82, 8 + ((idx % 4) * 20));
+                    const fallbackY = Math.min(82, 12 + (Math.floor(idx / 4) * 18));
+                    if (!badge.style.left) badge.style.left = fallbackX + '%';
+                    if (!badge.style.top) badge.style.top = fallbackY + '%';
+                }
+            });
+
+            block.insertAdjacentElement('afterend', clone);
+            enhanceBuilderEditor();
+            clone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setStatus('Block duplicated.');
+        }
+
+        function normalizeAnnotationNumbers(overlay, forceSequential = false) {
+            const badges = overlay.querySelectorAll('.annotation-badge');
+            badges.forEach((b, idx) => {
+                const num = b.querySelector('.annot-num');
+                if (!num) return;
+                if (forceSequential || !String(num.textContent || '').trim()) num.textContent = String(idx + 1);
+            });
+        }
+
+        function setupAnnotationBadgeDrag(badge, overlay) {
+            if (badge.dataset.dragReady === '1') return;
+            badge.dataset.dragReady = '1';
+            badge.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('annot-delete')) return;
+                if (!e.target.classList.contains('annot-drag') && !e.target.closest('.annot-drag')) return;
+                e.preventDefault();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const rect = overlay.getBoundingClientRect();
+                const leftPx = (parseFloat(badge.style.left) || 0) / 100 * rect.width;
+                const topPx = (parseFloat(badge.style.top) || 0) / 100 * rect.height;
+
+                const onMove = (ev) => {
+                    const r = overlay.getBoundingClientRect();
+                    const newLeft = Math.max(0, Math.min(r.width - 30, leftPx + (ev.clientX - startX)));
+                    const newTop = Math.max(0, Math.min(r.height - 30, topPx + (ev.clientY - startY)));
+                    const pctLeft = (newLeft / r.width) * 100;
+                    const pctTop = (newTop / r.height) * 100;
+                    const snappedLeft = Math.max(0, Math.min(100, snapPct(pctLeft)));
+                    const snappedTop = Math.max(0, Math.min(100, snapPct(pctTop)));
+                    badge.style.left = snappedLeft.toFixed(2) + '%';
+                    badge.style.top = snappedTop.toFixed(2) + '%';
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+                setActiveAnnotationBadge(badge);
+            });
+        }
+
+        function makeBlockDraggable(block) {
+            if (!block || block.dataset.blockSetup === '1') return;
+            block.dataset.blockSetup = '1';
+            block.setAttribute('draggable', 'false');
+            applyBlockLayout(block);
+            applyGroupVisual(block);
+            setupBlockResizeHandle(block);
+
+            const controls = document.createElement('div');
+            controls.className = 'sop-block-controls';
+            controls.setAttribute('contenteditable', 'false');
+
+            const drag = document.createElement('button');
+            drag.type = 'button';
+            drag.className = 'sop-block-btn sop-drag-handle';
+            drag.textContent = '↕';
+            drag.title = 'Drag to reorder';
+            drag.setAttribute('draggable', 'true');
+            drag.addEventListener('dragstart', (ev) => {
+                dragBlock = block;
+                dragGroupBlocks = getGroupedBlocks(block);
+                dragGroupBlocks.forEach((item) => item.classList.add('dragging'));
+                ev.dataTransfer.effectAllowed = 'move';
+                ev.dataTransfer.setData('text/plain', block.dataset.blockId || '');
+                setTimeout(() => {
+                    dragGroupBlocks.forEach((item) => { item.style.opacity = '0.35'; });
+                }, 0);
+            });
+            drag.addEventListener('dragend', () => {
+                dragGroupBlocks.forEach((item) => {
+                    item.style.opacity = '1';
+                    item.classList.remove('dragging');
+                });
+                getEditor().querySelectorAll('.sop-block').forEach((el) => el.classList.remove('drag-over'));
+                dragBlock = null;
+                dragGroupBlocks = [];
+            });
+
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'sop-block-btn';
+            del.textContent = 'Del';
+            del.title = 'Delete block';
+            del.onclick = () => {
+                if (confirm('Delete this SOP block?')) block.remove();
+            };
+
+            const dup = document.createElement('button');
+            dup.type = 'button';
+            dup.className = 'sop-block-btn';
+            dup.textContent = 'Copy';
+            dup.title = 'Duplicate block';
+            dup.onclick = () => duplicateBlock(block);
+
+            const groupAdd = document.createElement('button');
+            groupAdd.type = 'button';
+            groupAdd.className = 'sop-block-btn';
+            groupAdd.textContent = 'G+';
+            groupAdd.title = 'Assign/edit group id (same id moves blocks together)';
+            groupAdd.onclick = () => assignBlockGroup(block);
+
+            const groupClear = document.createElement('button');
+            groupClear.type = 'button';
+            groupClear.className = 'sop-block-btn';
+            groupClear.textContent = 'G-';
+            groupClear.title = 'Remove group';
+            groupClear.onclick = () => clearBlockGroup(block);
+
+            controls.appendChild(drag);
+            controls.appendChild(dup);
+            controls.appendChild(groupAdd);
+            controls.appendChild(groupClear);
+            controls.appendChild(del);
+
+            const full = document.createElement('button');
+            full.type = 'button';
+            full.className = 'sop-block-btn sop-size-chip';
+            full.textContent = '1/1';
+            full.title = 'Full width';
+            full.onclick = () => {
+                delete block.dataset.manualWidthPx;
+                applyBlockLayout(block, 12, null);
+            };
+
+            const half = document.createElement('button');
+            half.type = 'button';
+            half.className = 'sop-block-btn sop-size-chip';
+            half.textContent = '1/2';
+            half.title = 'Half width';
+            half.onclick = () => {
+                delete block.dataset.manualWidthPx;
+                applyBlockLayout(block, 6, null);
+            };
+
+            const third = document.createElement('button');
+            third.type = 'button';
+            third.className = 'sop-block-btn sop-size-chip';
+            third.textContent = '1/3';
+            third.title = 'One-third width';
+            third.onclick = () => {
+                delete block.dataset.manualWidthPx;
+                applyBlockLayout(block, 4, null);
+            };
+
+            const shortH = document.createElement('button');
+            shortH.type = 'button';
+            shortH.className = 'sop-block-btn sop-size-chip';
+            shortH.textContent = 'S';
+            shortH.title = 'Short height';
+            shortH.onclick = () => applyBlockLayout(block, null, 110);
+
+            const medH = document.createElement('button');
+            medH.type = 'button';
+            medH.className = 'sop-block-btn sop-size-chip';
+            medH.textContent = 'M';
+            medH.title = 'Medium height';
+            medH.onclick = () => applyBlockLayout(block, null, 180);
+
+            const tallH = document.createElement('button');
+            tallH.type = 'button';
+            tallH.className = 'sop-block-btn sop-size-chip';
+            tallH.textContent = 'T';
+            tallH.title = 'Tall height';
+            tallH.onclick = () => applyBlockLayout(block, null, 280);
+
+            const autoH = document.createElement('button');
+            autoH.type = 'button';
+            autoH.className = 'sop-block-btn sop-size-chip';
+            autoH.textContent = 'A';
+            autoH.title = 'Auto height (fit content)';
+            autoH.onclick = () => {
+                delete block.dataset.manualWidthPx;
+                applyBlockLayout(block, null, 'auto');
+            };
+
+            controls.appendChild(full);
+            controls.appendChild(half);
+            controls.appendChild(third);
+            controls.appendChild(shortH);
+            controls.appendChild(medH);
+            controls.appendChild(tallH);
+            controls.appendChild(autoH);
+
+            if (block.classList.contains('sop-section')) {
+                const cleanToggle = document.createElement('button');
+                cleanToggle.type = 'button';
+                cleanToggle.className = 'sop-block-btn sop-size-chip';
+                cleanToggle.textContent = 'Clr';
+                cleanToggle.title = 'Toggle clean section (no side color border)';
+                cleanToggle.onclick = () => {
+                    block.classList.toggle('sop-section-clean');
+                };
+                controls.appendChild(cleanToggle);
+            }
+
+            if (block.classList.contains('sop-annotated-image')) {
+                const addAnnot = document.createElement('button');
+                addAnnot.type = 'button';
+                addAnnot.className = 'sop-block-btn';
+                addAnnot.textContent = '+#';
+                addAnnot.title = 'Add annotation';
+                addAnnot.onclick = () => addAnnotationToBlock(block);
+                controls.appendChild(addAnnot);
+            }
+
+            if (block.classList.contains('sop-logo-wrap')) {
+                const logoBtn = document.createElement('button');
+                logoBtn.type = 'button';
+                logoBtn.className = 'sop-block-btn';
+                logoBtn.textContent = 'Logo';
+                logoBtn.title = 'Upload logo';
+                logoBtn.onclick = () => pickImage('logo', block.dataset.blockId || null);
+                controls.appendChild(logoBtn);
+            }
+
+            block.appendChild(controls);
+        }
+
+        function setupEditorDropZones() {
+            const editor = getEditor();
+            if (!editor || editor.dataset.dropReady === '1') return;
+            editor.dataset.dropReady = '1';
+
+            editor.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (!dragBlock) return;
+                const target = e.target.closest('.sop-block');
+                editor.querySelectorAll('.sop-block').forEach((el) => el.classList.remove('drag-over'));
+                if (target && target !== dragBlock) target.classList.add('drag-over');
+            });
+
+            editor.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!dragBlock) return;
+                const target = e.target.closest('.sop-block');
+                editor.querySelectorAll('.sop-block').forEach((el) => el.classList.remove('drag-over'));
+                const moving = dragGroupBlocks.length ? dragGroupBlocks : [dragBlock];
+                if (target && !moving.includes(target)) {
+                    const anchor = target;
+                    moving.forEach((item) => editor.insertBefore(item, anchor));
+                } else {
+                    moving.forEach((item) => editor.appendChild(item));
+                }
+            });
+
+            editor.addEventListener('click', (e) => {
+                const dot = e.target.closest('.section-color-dot');
+                if (dot) {
+                    const block = dot.closest('.sop-section');
+                    if (block) block.style.setProperty('--section-color', dot.dataset.color || '#2563eb');
+                    return;
+                }
+
+                const del = e.target.closest('.annot-delete');
+                if (del) {
+                    const badge = del.closest('.annotation-badge');
+                    if (badge) {
+                        const overlay = badge.closest('.annotation-overlay');
+                        if (badge === activeAnnotationBadge) setActiveAnnotationBadge(null);
+                        badge.remove();
+                        if (overlay) normalizeAnnotationNumbers(overlay, true);
+                    }
+                    return;
+                }
+
+                const badge = e.target.closest('.annotation-badge');
+                if (badge) {
+                    setActiveAnnotationBadge(badge);
+                    return;
+                }
+
+                if (!e.target.closest('.annotation-overlay')) {
+                    setActiveAnnotationBadge(null);
+                }
+            });
+        }
+
+        function rebuildAnnotationBadges() {
+            const editor = getEditor();
+            editor.querySelectorAll('.annotation-overlay').forEach((overlay) => {
+                const badges = Array.from(overlay.querySelectorAll('.annotation-badge'));
+                badges.forEach((badge, idx) => {
+                    const fallbackX = Math.min(82, 8 + ((idx % 4) * 20));
+                    const fallbackY = Math.min(82, 12 + (Math.floor(idx / 4) * 18));
+
+                    if (!badge.style.left) badge.style.left = fallbackX + '%';
+                    if (!badge.style.top) badge.style.top = fallbackY + '%';
+
+                    if (badge.querySelector('.annot-drag') && badge.querySelector('.annot-num') && badge.querySelector('.annot-delete')) {
+                        setupAnnotationBadgeDrag(badge, overlay);
+                        return;
+                    }
+
+                    const n = String(badge.textContent || '').trim() || String(idx + 1);
+                    badge.innerHTML = '<span class="annot-drag">⋮</span><span class="annot-num" contenteditable="true"></span><span class="annot-delete">×</span>';
+                    const num = badge.querySelector('.annot-num');
+                    if (num) num.textContent = n;
+                    setupAnnotationBadgeDrag(badge, overlay);
+                });
+                const nums = badges.map((b) => String((b.querySelector('.annot-num') && b.querySelector('.annot-num').textContent) || '').trim());
+                const allSame = nums.length > 1 && nums.every((n) => n && n === nums[0]);
+                normalizeAnnotationNumbers(overlay, allSame);
+            });
+        }
+
+        function enhanceBuilderEditor() {
+            const editor = getEditor();
+            if (!editor) return;
+            setupEditorDropZones();
+            editor.querySelectorAll('.sop-block').forEach((block) => makeBlockDraggable(block));
+            rebuildAnnotationBadges();
+        }
+
+        function cleanEditorHtmlForSave() {
+            const editor = getEditor();
+            const clone = editor.cloneNode(true);
+            clone.querySelectorAll('.sop-block-controls, .sop-resize-handle, .sop-group-chip').forEach((el) => el.remove());
+            clone.querySelectorAll('.sop-block').forEach((block) => {
+                block.classList.remove('drag-over', 'dragging', 'grouped');
+                block.removeAttribute('draggable');
+                delete block.dataset.blockSetup;
+                delete block.dataset.resizeSetup;
+            });
+            clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('.annotation-badge').forEach((badge) => {
+                const n = badge.querySelector('.annot-num');
+                const num = String((n && n.textContent) || '').trim() || '1';
+                badge.innerHTML = escapeHtml(num);
+            });
+            return clone.innerHTML;
+        }
+
+        function defaultSopTemplate() {
+            return [
+                '<div class="sop-block sop-logo-wrap" data-block-id="template_logo">',
+                '<img class="sop-logo" src="" alt="Logo" style="display:none;">',
+                '<div><h1 style="margin:0 0 6px 0;">New SOP</h1><p style="margin:0;"><strong>Owner:</strong> <span> </span> &nbsp; <strong>Revision:</strong> 1.0</p></div>',
+                '</div>',
+                '<div class="sop-block sop-section" style="--section-color:#2563eb;"><div class="sop-section-color-row" contenteditable="false"><span style="font-size:12px;color:var(--text-secondary)">Section color</span><span class="section-color-dot" data-color="#2563eb" style="background:#2563eb"></span><span class="section-color-dot" data-color="#0d9488" style="background:#0d9488"></span><span class="section-color-dot" data-color="#7c3aed" style="background:#7c3aed"></span><span class="section-color-dot" data-color="#dc2626" style="background:#dc2626"></span><span class="section-color-dot" data-color="#ea580c" style="background:#ea580c"></span></div><h2>Purpose</h2><p>Define the purpose of this procedure.</p></div>',
+                '<div class="sop-block sop-section" style="--section-color:#0d9488;"><div class="sop-section-color-row" contenteditable="false"><span style="font-size:12px;color:var(--text-secondary)">Section color</span><span class="section-color-dot" data-color="#2563eb" style="background:#2563eb"></span><span class="section-color-dot" data-color="#0d9488" style="background:#0d9488"></span><span class="section-color-dot" data-color="#7c3aed" style="background:#7c3aed"></span><span class="section-color-dot" data-color="#dc2626" style="background:#dc2626"></span><span class="section-color-dot" data-color="#ea580c" style="background:#ea580c"></span></div><h2>Procedure</h2><ol><li>Step 1</li><li>Step 2</li><li>Step 3</li></ol></div>',
+                '<div class="sop-block sop-section" style="--section-color:#dc2626;"><div class="sop-section-color-row" contenteditable="false"><span style="font-size:12px;color:var(--text-secondary)">Section color</span><span class="section-color-dot" data-color="#2563eb" style="background:#2563eb"></span><span class="section-color-dot" data-color="#0d9488" style="background:#0d9488"></span><span class="section-color-dot" data-color="#7c3aed" style="background:#7c3aed"></span><span class="section-color-dot" data-color="#dc2626" style="background:#dc2626"></span><span class="section-color-dot" data-color="#ea580c" style="background:#ea580c"></span></div><h2>Safety Notes</h2><ul><li>PPE</li><li>Hazards</li></ul></div>'
+            ].join('');
+        }
+
+        function parseCsv(s) {
+            return String(s || '')
+                .split(',')
+                .map(v => v.trim())
+                .filter(Boolean);
+        }
+
+        function renderList() {
+            const el = document.getElementById('sop_list');
+            el.innerHTML = '';
+            if (!docs.length) {
+                el.innerHTML = '<div class="sop-item"><div class="sop-item-meta">No SOP documents yet.</div></div>';
+                return;
+            }
+            docs.forEach(doc => {
+                const row = document.createElement('div');
+                row.className = 'sop-item' + (doc.id === activeId ? ' active' : '');
+                row.onclick = () => selectDoc(doc.id);
+                row.innerHTML = `
+                    <div class="sop-item-title"></div>
+                    <div class="sop-item-meta"></div>
+                `;
+                row.querySelector('.sop-item-title').textContent = doc.title || 'Untitled SOP';
+                row.querySelector('.sop-item-meta').textContent = doc.updated_at ? ('Updated ' + doc.updated_at) : 'No timestamp';
+                el.appendChild(row);
+            });
+        }
+
+        function setStatus(msg) {
+            document.getElementById('status').textContent = msg || '';
+        }
+
+        function selectDoc(id) {
+            activeId = id;
+            const doc = docs.find(d => d.id === id);
+            if (!doc) return;
+            document.getElementById('doc_title').value = doc.title || '';
+            document.getElementById('doc_source').value = doc.source_path || '';
+            document.getElementById('doc_tags').value = (doc.tags || []).join(', ');
+            setStationsPickerFromList(doc.linked_stations || []);
+            getEditor().innerHTML = doc.content_html || '';
+            enhanceBuilderEditor();
+            setStatus('Loaded document: ' + (doc.title || 'Untitled SOP'));
+            renderList();
+        }
+
+        function newDoc() {
+            activeId = null;
+            document.getElementById('doc_title').value = '';
+            document.getElementById('doc_source').value = '';
+            document.getElementById('doc_tags').value = '';
+            setStationsPickerFromList([]);
+            getEditor().innerHTML = defaultSopTemplate();
+            enhanceBuilderEditor();
+            setStatus('New SOP builder draft ready. Click Save to create.');
+            renderList();
+            focusEditor();
+        }
+
+        async function reloadDocs() {
+            const res = await fetch('/api/sop/docs');
+            const data = await res.json();
+            docs = (data && data.docs) ? data.docs : [];
+            renderList();
+            if (requestedDocId && docs.some(d => d.id === requestedDocId)) {
+                selectDoc(requestedDocId);
+                requestedDocId = null;
+                return;
+            }
+            if (activeId && docs.some(d => d.id === activeId)) {
+                selectDoc(activeId);
+            } else if (docs.length) {
+                selectDoc(docs[0].id);
+            } else {
+                newDoc();
+            }
+        }
+
+        async function saveDoc() {
+            const payload = {
+                title: document.getElementById('doc_title').value,
+                source_path: document.getElementById('doc_source').value,
+                tags: parseCsv(document.getElementById('doc_tags').value),
+                linked_stations: getStationsFromPicker(),
+                content_html: cleanEditorHtmlForSave()
+            };
+
+            const isUpdate = !!activeId;
+            const url = isUpdate ? ('/api/sop/docs/' + encodeURIComponent(activeId)) : '/api/sop/docs';
+            const method = isUpdate ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setStatus('Save failed: ' + (data.error || ('HTTP ' + res.status)));
+                return;
+            }
+            setStatus('Saved successfully.');
+            await reloadDocs();
+            if (data.doc && data.doc.id) selectDoc(data.doc.id);
+        }
+
+        async function deleteDoc() {
+            if (!activeId) {
+                setStatus('Nothing to delete.');
+                return;
+            }
+            if (!confirm('Delete this SOP document?')) return;
+            const res = await fetch('/api/sop/docs/' + encodeURIComponent(activeId), { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) {
+                setStatus('Delete failed: ' + (data.error || ('HTTP ' + res.status)));
+                return;
+            }
+            setStatus('Deleted successfully.');
+            activeId = null;
+            await reloadDocs();
+        }
+
+        (function () {
+            const a = document.getElementById('shop_link');
+            if (!a) return;
+            try {
+                fetch('/chat', { method: 'GET' }).then(r => {
+                    if (r && r.ok) a.setAttribute('href', '/chat');
+                }).catch(() => {});
+            } catch (e) {}
+        })();
+
+        function initBuilderButtons() {
+            const bar = document.querySelector('.toolbar');
+            if (!bar || bar.dataset.enhanced === '1') return;
+            bar.dataset.enhanced = '1';
+
+            const makeBtn = (text, onclick, cls = 'btn btn-secondary') => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = cls;
+                b.textContent = text;
+                b.onclick = onclick;
+                return b;
+            };
+
+            const addCleanSectionBtn = document.createElement('button');
+            addCleanSectionBtn.type = 'button';
+            addCleanSectionBtn.className = 'btn btn-secondary';
+            addCleanSectionBtn.textContent = 'Clean Sec';
+            addCleanSectionBtn.onclick = () => insertSection('clean');
+            bar.appendChild(addCleanSectionBtn);
+
+            const sep = document.createElement('span');
+            sep.className = 'sep';
+            bar.appendChild(sep);
+            bar.appendChild(makeBtn('+ Element', addElementBlock));
+            bar.appendChild(makeBtn('+ Image + Notes', addAnnotatedImage));
+            bar.appendChild(makeBtn('+ Logo', addLogoBlock));
+
+            const sep2 = document.createElement('span');
+            sep2.className = 'sep';
+            bar.appendChild(sep2);
+
+            const snapToggle = document.createElement('button');
+            snapToggle.type = 'button';
+            snapToggle.className = 'btn btn-secondary';
+            snapToggle.textContent = 'Grid Snap: On';
+            snapToggle.title = 'Toggle annotation snap to grid for drag + arrow nudge';
+            snapToggle.onclick = () => {
+                annotationSnapEnabled = !annotationSnapEnabled;
+                snapToggle.textContent = annotationSnapEnabled ? 'Grid Snap: On' : 'Grid Snap: Off';
+                setStatus('Annotation snap ' + (annotationSnapEnabled ? 'enabled' : 'disabled') + '.');
+            };
+            bar.appendChild(snapToggle);
+
+            const snapSize = document.createElement('select');
+            snapSize.className = 'input';
+            snapSize.style.width = '86px';
+            snapSize.style.padding = '6px 8px';
+            snapSize.title = 'Grid step for annotation snap';
+            snapSize.innerHTML = [
+                '<option value="0.5">0.5%</option>',
+                '<option value="1" selected>1%</option>',
+                '<option value="2">2%</option>'
+            ].join('');
+            snapSize.onchange = () => {
+                annotationSnapStep = Number(snapSize.value) || 1;
+                setStatus('Annotation snap grid set to ' + annotationSnapStep + '%.');
+            };
+            bar.appendChild(snapSize);
+
+            const sep3 = document.createElement('span');
+            sep3.className = 'sep';
+            bar.appendChild(sep3);
+
+            bar.appendChild(makeBtn('📄 PDF', exportPdf));
+            bar.appendChild(makeBtn('⬇ SOP File', exportSopFile));
+            bar.appendChild(makeBtn('⬆ Import File', importSopFile));
+
+            const sep4 = document.createElement('span');
+            sep4.className = 'sep';
+            bar.appendChild(sep4);
+
+            const previewBtn = makeBtn('Preview: Off', togglePreviewMode);
+            previewBtn.id = 'preview_mode_btn';
+            previewBtn.title = 'Toggle preview mode (hide editor controls and lock editing)';
+            bar.appendChild(previewBtn);
+        }
+
+        initBuilderButtons();
+        setupAnnotationKeyboardNudge();
+        loadStationOptions()
+            .finally(() => reloadDocs().then(() => enhanceBuilderEditor()))
+            .catch(err => setStatus('Failed to load SOP docs: ' + err));
+    </script>
+</body>
+</html>

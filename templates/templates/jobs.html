@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Editor</title>
+    <link rel="stylesheet" href="/static/common.css?v=20251222">
+    <link rel="stylesheet" href="/static/mobile-nav.css?v=20260118">
+    <script src="/static/theme.js?v=20260416a"></script>
+    <script src="/static/mobile-nav.js?v=20260118"></script>
+    <style>
+        .container {
+            max-width: none;
+            margin: 20px 0;
+            padding: 0 20px;
+        }
+        .subtitle_note {
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .stat-card h3 {
+            margin: 0 0 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card .value {
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .controls, .bulkbar, .listbar {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: end;
+        }
+        .controls .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 180px;
+        }
+        .controls .field.grow {
+            flex: 1 1 320px;
+        }
+        .controls input, .controls select {
+            padding: 9px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+        .bulkbar, .listbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            position: sticky;
+            z-index: 20;
+        }
+        .bulkbar {
+            top: 0;
+        }
+        .listbar {
+            top: var(--jobs-bulkbar-height, 0px);
+        }
+        .count-pill, .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .status-pill.active {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .status-pill.archived {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+        }
+        .table_wrap {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            max-height: calc(100vh - 360px);
+            overflow: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-tertiary);
+            z-index: 5;
+            text-align: left;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 12px;
+        }
+        .sortable-th {
+            cursor: pointer;
+            user-select: none;
+        }
+        .sortable-th:hover {
+            background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-tertiary) 90%);
+        }
+        .sortable-head {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sort-indicator {
+            min-width: 12px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+        tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+        tbody tr.row-selected {
+            background: color-mix(in srgb, var(--accent-primary) 15%, var(--card-bg) 85%);
+        }
+        .job_name_cell {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .muted {
+            color: var(--text-secondary);
+        }
+        .mono {
+            font-family: Consolas, monospace;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .btn-small {
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        .btn-warning {
+            background: #f59e0b;
+            color: #fff;
+        }
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .spacer {
+            flex: 1 1 auto;
+        }
+        #message {
+            margin-bottom: 12px;
+            min-height: 24px;
+        }
+        .empty {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        thead th { position: relative; user-select: none; overflow: hidden; }
+        .resizer {
+            position: absolute; right: 0; top: 0; height: 100%; width: 5px;
+            cursor: col-resize; background: rgba(0,0,0,0.08); z-index: 1;
+        }
+        .resizer:hover { background: var(--accent-primary); }
+        .drag-handle {
+            cursor: grab; margin-right: 4px; opacity: 0.3;
+            font-size: 11px; vertical-align: middle;
+        }
+        th:hover .drag-handle { opacity: 1; }
+        th.dragging { opacity: 0.5; }
+        .job-name-display {
+            font-weight: 700; color: var(--text-primary);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .job-name-edit-wrap { display: flex; align-items: center; gap: 6px; }
+        .job-name-edit-wrap input {
+            font-weight: 700; border: 1px solid var(--accent-primary);
+            border-radius: 6px; padding: 4px 8px;
+            background: var(--input-bg); color: var(--text-primary);
+            min-width: 160px;
+        }
+        .pencil-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-secondary); font-size: 13px; padding: 2px;
+        }
+        .pencil-btn:hover { color: var(--accent-primary); }
+        .address-input {
+            margin-top: 4px; width: 100%; padding: 4px 8px;
+            border: 1px solid var(--input-border); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-secondary);
+            font-size: 12px;
+        }
+        .add-job-form {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            margin-top: 8px; padding: 10px 12px;
+            background: var(--bg-secondary); border-radius: 8px;
+        }
+        .add-job-form input { padding: 7px 10px; border: 1px solid var(--input-border); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); }
+        .client-pill {
+            display: inline-flex; align-items: center;
+            background: color-mix(in srgb, var(--accent-primary) 12%, var(--card-bg) 88%);
+            color: var(--accent-primary); border-radius: 999px;
+            padding: 2px 9px; font-size: 11px; font-weight: 600;
+            text-decoration: none; margin: 2px 2px 2px 0; white-space: nowrap;
+        }
+        .client-pill:hover { background: color-mix(in srgb, var(--accent-primary) 22%, var(--card-bg) 78%); }
+        .chat-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            color: var(--accent-primary); text-decoration: none;
+            font-size: 12px; font-weight: 600; padding: 3px 0;
+        }
+        .chat-link:hover { text-decoration: underline; }
+        .card-status-select {
+            padding: 5px 8px; border: 1px solid var(--input-border);
+            border-radius: 6px; background: var(--input-bg);
+            color: var(--text-primary); font-size: 12px;
+            min-width: 150px; cursor: pointer;
+        }
+        .card-status-select.has-card { border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 600; }
+        .card-no-link { color: var(--text-secondary); font-size: 12px; }
+        .custom-cell-input {
+            padding: 4px 6px; border: 1px solid var(--input-border); border-radius: 5px;
+            background: var(--input-bg); color: var(--text-primary); font-size: 12px;
+        }
+        .custom-cell-input:focus { border-color: var(--accent-primary); outline: none; }
+        .job-type-select {
+            padding: 4px 8px; border: 1px solid var(--input-border); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-primary); font-size: 12px;
+            min-width: 120px; cursor: pointer;
+        }
+        .job-type-select:focus { border-color: var(--accent-primary); outline: none; }
+        @media (max-width: 900px) {
+            .container {
+                padding: 0 12px;
+            }
+            .table_wrap {
+                max-height: calc(100vh - 320px);
+            }
+            .controls .field, .controls .field.grow {
+                min-width: 100%;
+                flex: 1 1 100%;
+            }
+            .actions {
+                min-width: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile_menu_overlay" id="mobile_menu_overlay" onclick="closeMobileMenu()"></div>
+    <div class="mobile_slide_menu" id="mobile_slide_menu">
+      <div class="mobile_menu_header"><h3>Menu</h3><button class="mobile_menu_close" onclick="closeMobileMenu()">×</button></div>
+      <nav class="mobile_menu_nav">
+        <div class="mobile_menu_section">Main</div>
+        <a href="/shop">🏠 Dashboard</a>
+        <button class="mobile_menu_expand" onclick="toggleMobileSubmenu(this)">📊 Reports</button>
+        <div class="mobile_menu_submenu">
+          <a href="/reports">📈 Main Report</a>
+          <a href="/reports#scan_log">📋 Scan Log</a>
+          <a href="/reports#part_search">🔍 Part Search</a>
+          <a href="/reports#detailed">📊 Detailed Reports</a>
+        </div>
+        <a href="/labels">🏷️ Labels</a>
+        <a href="/bins">📦 Bins</a>
+        <div class="mobile_menu_section">Production</div>
+        <a href="/mobile">📱 Mobile Scan</a>
+        <a href="/maintenance">🔧 Maintenance</a>
+        <a href="/inventory">📦 Inventory</a>
+        <a href="/scans">📝 Scan Log</a>
+        <a href="/tools">🛠️ Tools</a>
+        <a href="/recuts">🔄 Recuts</a>
+        <div class="mobile_menu_section">Office</div>
+        <a href="/chat">💬 Chat</a>
+        <a href="/jobs" class="active">🗂️ Jobs</a>
+        <a href="/boards">📋 Boards</a>
+        <a href="/schedule">📅 Schedule</a>
+        <a href="/todo">✅ Tasks</a>
+        <a href="/crm">📧 CRM</a>
+        <a href="/notifications">🔔 Notifications</a>
+        <div class="mobile_menu_section">System</div>
+        <a href="/stations">⚙️ Admin</a>
+        <a href="/help">❓ Help</a>
+        <a href="/choose_shop">🔄 Switch Shop</a>
+        <a href="#" onclick="openMobileNavSettings(); closeMobileMenu(); return false;">📱 Customize Nav</a>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout_form').submit();">🚪 Logout</a>
+      </nav>
+    </div>
+
+    <div class="header">
+        <div class="mobile_header_row">
+          <button class="mobile_hamburger" onclick="openMobileMenu()">☰</button>
+          <h1>🗂️ Job Editor</h1>
+        </div>
+        <h1 class="desktop_only">🗂️ Job Editor</h1>
+        <div class="subtitle desktop_only">Full-screen job list for bulk archive, restore, delete, and merge</div>
+        <div class="nav_primary">
+            <a class="nav_btn" href="/shop">Dashboard</a>
+            <a class="nav_btn" href="/reports">Reports</a>
+            <a class="nav_btn active" href="/chat">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/stations">Admin</a>
+            <a class="nav_btn" href="/help">Help</a>
+            <a class="nav_btn" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <form method="post" action="/logout" id="logout_form" style="display:inline;">
+                <button class="btn btn-secondary" type="submit" style="padding:8px 10px;">Logout</button>
+            </form>
+        </div>
+    </div>
+    <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/chat">Chat</a>
+        <a class="nav_btn active" href="/jobs">Jobs</a>
+        <a class="nav_btn" href="/boards">Boards</a>
+        <a class="nav_btn" href="/schedule">Schedule</a>
+        <a class="nav_btn" href="/todo">Tasks</a>
+        <a class="nav_btn" href="/crm">CRM</a>
+        <a class="nav_btn" href="/notifications">Notifications</a>
+        <a class="nav_btn" href="/choose_shop">Switch Shop</a>
+    </div>
+    <div class="mobile_bottom_nav" id="mobile_bottom_nav"></div>
+
+    <div class="container">
+        <datalist id="jobs_datalist"></datalist>
+        <div class="subtitle_note">Archive hides jobs from normal dropdowns. Delete permanently purges the job from scans, chat/client job links, and autofill/search sources.</div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><h3>Total Jobs</h3><div class="value" id="statTotal">0</div></div>
+            <div class="stat-card"><h3>Active Jobs</h3><div class="value" id="statActive">0</div></div>
+            <div class="stat-card"><h3>Archived Jobs</h3><div class="value" id="statArchived">0</div></div>
+            <div class="stat-card"><h3>With Chat Channel</h3><div class="value" id="statChannels">0</div></div>
+        </div>
+
+        <div class="controls">
+            <div class="field grow">
+                <label for="searchInput">Search jobs</label>
+                <input id="searchInput" type="text" placeholder="Search by job name or job number..." oninput="applyFilters()">
+            </div>
+            <div class="field">
+                <label for="statusFilter">Status</label>
+                <select id="statusFilter" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    <option value="active" selected>Active</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="channelFilter">Chat channel</label>
+                <select id="channelFilter" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    <option value="yes">Has channel</option>
+                    <option value="no">No channel</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="clientFilter">Client links</label>
+                <select id="clientFilter" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    <option value="yes">Has links</option>
+                    <option value="no">No links</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="sortBy">Sort</label>
+                <select id="sortBy" onchange="applySortFromControl()">
+                    <option value="name:asc">Job A-Z</option>
+                    <option value="name:desc">Job Z-A</option>
+                    <option value="job_number:asc">Job Number A-Z</option>
+                    <option value="job_number:desc">Job Number Z-A</option>
+                    <option value="status:asc">Status A-Z</option>
+                    <option value="status:desc">Status Z-A</option>
+                    <option value="scan_count:asc">Scans Low-High</option>
+                    <option value="scan_count:desc">Scans High-Low</option>
+                    <option value="last_scan_at:asc">Last Scan Old-New</option>
+                    <option value="last_scan_at:desc">Last Scan New-Old</option>
+                    <option value="client_count:asc">Client Links Low-High</option>
+                    <option value="client_count:desc">Client Links High-Low</option>
+                    <option value="has_channel:asc">Chat No-Yes</option>
+                    <option value="has_channel:desc">Chat Yes-No</option>
+                    <option value="appears_in_recent:asc">Recent No-Yes</option>
+                    <option value="appears_in_recent:desc">Recent Yes-No</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <button class="btn" type="button" onclick="loadJobs()">Refresh</button>
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <button class="btn btn-success" type="button" onclick="toggleAddJobForm()">+ Add Job</button>
+            </div>
+            <div class="field grow" style="min-width:240px;">
+                <label for="mergeTargetInput">Merge target</label>
+                <input id="mergeTargetInput" list="jobs_datalist" type="text" placeholder="Correct job name for merge...">
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                <button class="btn" type="button" onclick="toggleColumnManager()">&#9881; Columns</button>
+            </div>
+            <div class="field">
+                <label for="cardBoardSel">Card Status Board</label>
+                <select id="cardBoardSel" onchange="onCardBoardChange()" style="padding:9px 12px; border:1px solid var(--input-border); border-radius:8px; background:var(--input-bg); color:var(--text-primary);">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+        </div>
+        <div id="addJobForm" class="add-job-form" style="display:none;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;font-weight:600;">Job Name *</label>
+                <input id="newJobName" type="text" placeholder="Job name" style="min-width:200px;" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;font-weight:600;">Address</label>
+                <input id="newJobAddress" type="text" placeholder="Address (optional)" style="min-width:200px;" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;font-weight:600;">Link Clients</label>
+                <input type="text" id="addJobClientSearch" placeholder="Filter clients…" oninput="filterAddJobClients(this.value)"
+                    style="min-width:180px;padding:5px 8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);margin-bottom:2px;" />
+                <select id="newJobClientSel" multiple size="4" style="min-width:180px;padding:4px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);">
+                    <option disabled value="">— load clients —</option>
+                </select>
+                <span style="font-size:10px;color:var(--text-muted);">Ctrl/Cmd+click to select multiple</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button class="btn btn-success" type="button" onclick="addJob()">Add Job</button>
+                <button class="btn btn-secondary" type="button" onclick="toggleAddJobForm()">Cancel</button>
+            </div>
+        </div>
+
+        <div id="columnManagerPanel" style="display:none;background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:16px;margin-bottom:12px;max-width:600px;">
+            <div style="font-weight:700;margin-bottom:10px;">&#9881; Column Visibility &amp; Custom Columns</div>
+            <div id="colMgrList" style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:14px;"></div>
+            <div style="border-top:1px solid var(--border-color);padding-top:12px;margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Job Type Options <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(edit to fit your workflow)</span></div>
+                <div id="jobTypeOptionsList" style="margin-bottom:6px;"></div>
+                <div style="display:flex;gap:6px;">
+                    <input id="newJobTypeInput" type="text" placeholder="Add type (e.g. Doors)" style="flex:1;padding:5px 8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);" />
+                    <button class="btn btn-success btn-small" type="button" onclick="addJobTypeOption()">+ Add</button>
+                </div>
+            </div>
+            <div style="border-top:1px solid var(--border-color);padding-top:12px;">
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Add Custom Column</div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input id="newColLabel" type="text" placeholder="Column name (e.g. Delivery Date)"
+                        style="min-width:200px;padding:6px 10px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);" />
+                    <select id="newColType" style="padding:6px 10px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);">
+                        <option value="text">Text</option>
+                        <option value="date">Date</option>
+                        <option value="url">Link / URL</option>
+                    </select>
+                    <button class="btn btn-success" type="button" onclick="addCustomCol()">+ Add Column</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bulkbar" id="bulkbar">
+            <span class="count-pill" id="selectedCount">0 selected</span>
+            <button class="btn" type="button" onclick="selectAllVisible()">Select all visible</button>
+            <button class="btn" type="button" onclick="clearSelection()">Clear</button>
+            <button class="btn btn-warning" type="button" onclick="runBulkAction('archive')">Archive</button>
+            <button class="btn btn-success" type="button" onclick="runBulkAction('restore')">Restore</button>
+            <button class="btn btn-primary" type="button" onclick="runBulkAction('merge')">Merge Selected</button>
+            <button class="btn btn-danger" type="button" onclick="runBulkAction('cleanup')">Cleanup Selected</button>
+            <span class="spacer"></span>
+            <button class="btn btn-secondary" type="button" onclick="location.href='/chat'">Back to Chat</button>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="listbar">
+            <div class="count-pill" id="listMeta">Showing 0</div>
+            <span class="spacer"></span>
+            <label for="pageSizeSel" class="muted">Per page:</label>
+            <select id="pageSizeSel" onchange="onPageSizeChange()">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+            <button class="btn" type="button" onclick="prevPage()">Prev</button>
+            <div class="count-pill" id="pageMeta">Page 1 / 1</div>
+            <button class="btn" type="button" onclick="nextPage()">Next</button>
+        </div>
+
+        <div class="table_wrap">
+            <table>
+                <thead>
+                    <tr id="tableHeaderRow">
+                        <th style="width:36px;"><input id="chkAll" type="checkbox" onchange="toggleAllCheckbox(this.checked)"></th>
+                        <th data-col="job" class="sortable-th" onclick="toggleJobSort('name')"><span class="sortable-head">Job <span class="sort-indicator" id="sort_name"></span></span></th>
+                        <th data-col="number" class="sortable-th" onclick="toggleJobSort('job_number')"><span class="sortable-head">Job Number <span class="sort-indicator" id="sort_job_number"></span></span></th>
+                        <th data-col="estimate" class="sortable-th" onclick="toggleJobSort('estimate_number')"><span class="sortable-head">Estimate # <span class="sort-indicator" id="sort_estimate_number"></span></span></th>
+                        <th data-col="status" class="sortable-th" onclick="toggleJobSort('status')"><span class="sortable-head">Status <span class="sort-indicator" id="sort_status"></span></span></th>
+                        <th data-col="scans" class="sortable-th" onclick="toggleJobSort('scan_count')"><span class="sortable-head">Scans <span class="sort-indicator" id="sort_scan_count"></span></span></th>
+                        <th data-col="last_scan" class="sortable-th" onclick="toggleJobSort('last_scan_at')"><span class="sortable-head">Last Scan <span class="sort-indicator" id="sort_last_scan_at"></span></span></th>
+                        <th data-col="client_links" class="sortable-th" onclick="toggleJobSort('client_count')"><span class="sortable-head">Client Links <span class="sort-indicator" id="sort_client_count"></span></span></th>
+                        <th data-col="chat" class="sortable-th" onclick="toggleJobSort('has_channel')"><span class="sortable-head">Chat <span class="sort-indicator" id="sort_has_channel"></span></span></th>
+                        <th data-col="recent" class="sortable-th" onclick="toggleJobSort('appears_in_recent')"><span class="sortable-head">Recent <span class="sort-indicator" id="sort_appears_in_recent"></span></span></th>
+                        <th data-col="job_type">Job Type</th>
+                        <th data-col="card_status" class="sortable-th" onclick="toggleJobSort('card_status')"><span class="sortable-head">Card Status <span class="sort-indicator" id="sort_card_status"></span></span></th>
+                        <th data-col="actions" style="min-width:220px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="jobsTableBody">
+                    <tr><td colspan="10" class="empty">Loading jobs...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let ALL_JOBS = [];
+        let FILTERED_JOBS = [];
+        let VISIBLE_JOBS = [];
+        let selectedNames = new Set();
+        let currentPage = 1;
+        let pageSize = 100;
+        let JOB_SORT_FIELD = 'name';
+        let JOB_SORT_DIRECTION = 'asc';
+        let colOrder = ['job','number','estimate','status','job_type','scans','last_scan','client_links','chat','recent','card_status','actions'];
+        let colWidths = {};
+        const KNOWN_COLS = ['job','number','estimate','status','job_type','scans','last_scan','client_links','chat','recent','card_status','actions'];
+        let hiddenCols = new Set(['recent']); // cols hidden by default
+        let JOB_TYPES = ['Custom','RTA','Doors','Components']; // configurable per shop
+        let JOB_TYPE_DATA = {}; // {jobNameLower: typeString}
+        let CUSTOM_COLS = []; // [{key, label, type}]  type: text|date|url
+        let CUSTOM_DATA = {}; // {jobNameLower: {colKey: value}}
+        let ALL_CLIENTS = []; // [{id, name}] populated by loadClients()
+        let CLIENT_MAP = {};   // kept for backwards compat but not used directly
+        let BOARDS_DATA = [];
+        let CARD_STATUS_MAP = {};
+        let BOARD_COLUMNS = [];
+        let CARD_STATUS_BOARD_ID = null;
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showMessage(text, type = 'info') {
+            const el = document.getElementById('message');
+            if (!el) return;
+            const bg = type === 'error' ? 'color-mix(in srgb, #b42318 15%, var(--card-bg) 85%)' : (type === 'success' ? 'color-mix(in srgb, #027a48 15%, var(--card-bg) 85%)' : 'color-mix(in srgb, var(--accent-primary) 15%, var(--card-bg) 85%)');
+            const color = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : 'var(--accent-primary)');
+            el.innerHTML = text ? `<div style="background:${bg}; color:${color}; border:1px solid var(--border-color); border-radius:8px; padding:10px 12px;">${escapeHtml(text)}</div>` : '';
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '—';
+            try {
+                const d = new Date(value);
+                if (Number.isNaN(d.getTime())) return '—';
+                return d.toLocaleString();
+            } catch {
+                return '—';
+            }
+        }
+
+        function compareText(a, b) {
+            return String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        function compareNumber(a, b) {
+            return Number(a || 0) - Number(b || 0);
+        }
+
+        function compareDate(a, b) {
+            const ta = a ? new Date(a).getTime() : 0;
+            const tb = b ? new Date(b).getTime() : 0;
+            return ta - tb;
+        }
+
+        function getJobSortValue(job, field) {
+            switch (field) {
+                case 'name': return String(job.display_name || job.name || '').toLowerCase();
+                case 'job_number': return String(job.job_number || '').toLowerCase();
+                case 'status': return job.hidden ? 'archived' : 'active';
+                case 'scan_count': return Number(job.scan_count || 0);
+                case 'last_scan_at': return job.last_scan_at || null;
+                case 'client_count': return Number(job.client_count || 0);
+                case 'has_channel': return job.has_channel ? 1 : 0;
+                case 'appears_in_recent': return job.appears_in_recent ? 1 : 0;
+                case 'estimate_number': return String(job.estimate_number || '').toLowerCase();
+                case 'card_status': {
+                    const info = CARD_STATUS_MAP[(String(job.name||'')).toLowerCase()];
+                    if (!info) return 'zzz';
+                    const col = BOARD_COLUMNS.find(c => c.id === info.column_id);
+                    return String(col?.name || info.column_name || '').toLowerCase();
+                }
+                default: {
+                    // Support sorting by custom column key
+                    const customVal = CUSTOM_DATA[field]?.[String(job.name||'').toLowerCase()];
+                    return String(customVal || '').toLowerCase();
+                }
+            }
+        }
+
+        function syncSortControl() {
+            const select = document.getElementById('sortBy');
+            if (!select) return;
+            select.value = `${JOB_SORT_FIELD}:${JOB_SORT_DIRECTION}`;
+        }
+
+        function updateJobSortIndicators() {
+            ['name', 'job_number', 'estimate_number', 'status', 'scan_count', 'last_scan_at', 'client_count', 'has_channel', 'appears_in_recent', 'card_status', ...CUSTOM_COLS.map(c=>c.key)].forEach(field => {
+                const el = document.getElementById(`sort_${field}`);
+                if (!el) return;
+                el.textContent = field === JOB_SORT_FIELD ? (JOB_SORT_DIRECTION === 'asc' ? '▲' : '▼') : '';
+            });
+        }
+
+        function toggleJobSort(field) {
+            if (JOB_SORT_FIELD === field) {
+                JOB_SORT_DIRECTION = JOB_SORT_DIRECTION === 'asc' ? 'desc' : 'asc';
+            } else {
+                JOB_SORT_FIELD = field;
+                JOB_SORT_DIRECTION = 'asc';
+            }
+            syncSortControl();
+            applyFilters(false);
+        }
+
+        function applySortFromControl() {
+            const value = document.getElementById('sortBy')?.value || 'name:asc';
+            const [field, direction] = value.split(':');
+            JOB_SORT_FIELD = field || 'name';
+            JOB_SORT_DIRECTION = direction === 'desc' ? 'desc' : 'asc';
+            applyFilters(false);
+        }
+
+        function syncSelectionToData() {
+            const valid = new Set(ALL_JOBS.map(job => job.name));
+            selectedNames = new Set(Array.from(selectedNames).filter(name => valid.has(name)));
+            updateSelectedCount();
+        }
+
+        function updateStats(data) {
+            const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+            document.getElementById('statTotal').textContent = String(jobs.length);
+            document.getElementById('statActive').textContent = String(data.active_count || 0);
+            document.getElementById('statArchived').textContent = String(data.archived_count || 0);
+            document.getElementById('statChannels').textContent = String(jobs.filter(job => job.has_channel).length);
+        }
+
+        function updateJobsDatalist() {
+            const dl = document.getElementById('jobs_datalist');
+            if (!dl) return;
+            const names = Array.from(new Set(ALL_JOBS.map(job => String(job.name || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+            dl.innerHTML = names.map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+        }
+
+        async function loadJobs() {
+            showMessage('');
+            const tbody = document.getElementById('jobsTableBody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="empty">Loading jobs...</td></tr>';
+            try {
+                const res = await fetch('/api/chat/jobs/manage?include_hidden=1&limit=5000');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) {
+                    throw new Error(data.error || 'Failed to load jobs');
+                }
+                ALL_JOBS = Array.isArray(data.jobs) ? data.jobs : [];
+                updateStats(data);
+                updateJobsDatalist();
+                syncSelectionToData();
+                currentPage = 1;
+                applyFilters();
+            } catch (err) {
+                console.error(err);
+                if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="empty">Failed to load jobs.</td></tr>';
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function applyFilters(resetPage = true) {
+            const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+            const status = document.getElementById('statusFilter')?.value || 'all';
+            const channel = document.getElementById('channelFilter')?.value || 'all';
+            const client = document.getElementById('clientFilter')?.value || 'all';
+            FILTERED_JOBS = ALL_JOBS.filter(job => {
+                const name = String(job.name || '').toLowerCase();
+                const displayName = String(job.display_name || job.name || '').toLowerCase();
+                const jobNumber = String(job.job_number || '').toLowerCase();
+                const jobNumberDigits = jobNumber.replace(/\D+/g, '');
+                const qDigits = q.replace(/\D+/g, '');
+                if (q && !(name.includes(q) || displayName.includes(q) || jobNumber.includes(q) || (qDigits && jobNumberDigits.includes(qDigits)))) return false;
+                if (status === 'active' && job.hidden) return false;
+                if (status === 'archived' && !job.hidden) return false;
+                if (channel === 'yes' && !job.has_channel) return false;
+                if (channel === 'no' && job.has_channel) return false;
+                if (client === 'yes' && !(Number(job.client_count || 0) > 0)) return false;
+                if (client === 'no' && Number(job.client_count || 0) > 0) return false;
+                return true;
+            });
+
+            FILTERED_JOBS.sort((a, b) => {
+                const field = JOB_SORT_FIELD || 'name';
+                const dir = JOB_SORT_DIRECTION === 'desc' ? -1 : 1;
+                const fallback = compareText(String(a.display_name || a.name || ''), String(b.display_name || b.name || ''));
+
+                let cmp = 0;
+                if (['scan_count', 'client_count', 'has_channel', 'appears_in_recent'].includes(field)) {
+                    cmp = compareNumber(getJobSortValue(a, field), getJobSortValue(b, field));
+                } else if (field === 'last_scan_at') {
+                    cmp = compareDate(getJobSortValue(a, field), getJobSortValue(b, field));
+                } else {
+                    cmp = compareText(getJobSortValue(a, field), getJobSortValue(b, field));
+                }
+
+                if (cmp === 0) return fallback;
+                return cmp * dir;
+            });
+
+            if (resetPage) currentPage = 1;
+            updateJobSortIndicators();
+            renderJobs();
+        }
+
+        function buildJobCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const displayName = String(job.display_override || job.display_name || name);
+            const address = String(job.address || '');
+            return `<td style="min-width:200px;" data-col-cell="job">
+                <div class="job-name-display" id="nameDisplay_${enc}">
+                    <span>${escapeHtml(displayName)}</span>
+                    <button class="pencil-btn" title="Rename" onclick="startNameEdit(decodeURIComponent('${enc}'))">✏️</button>
+                </div>
+                <div class="job-name-edit-wrap" id="nameEdit_${enc}" style="display:none;">
+                    <input id="job_name_edit_${enc}" type="text" value="${escapeHtml(displayName)}" placeholder="Display name"
+                        onkeydown="if(event.key==='Enter') saveJobName(decodeURIComponent('${enc}'),'job_name_edit_${enc}'); if(event.key==='Escape') cancelNameEdit(decodeURIComponent('${enc}'));" />
+                    <button class="btn btn-small" onclick="saveJobName(decodeURIComponent('${enc}'),'job_name_edit_${enc}')">Save</button>
+                    <button class="btn btn-secondary btn-small" onclick="cancelNameEdit(decodeURIComponent('${enc}'))">✕</button>
+                </div>
+                <input id="job_addr_${enc}" class="address-input" type="text" value="${escapeHtml(address)}" placeholder="Address..."
+                    onblur="saveJobAddress(decodeURIComponent('${enc}'),'job_addr_${enc}')"
+                    onkeydown="if(event.key==='Enter') this.blur();" />
+            </td>`;
+        }
+
+        function buildNumberCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const jobNumber = String(job.job_number || '').trim();
+            return `<td data-col-cell="number">
+                <div style="display:flex; gap:6px; align-items:center; min-width:180px;">
+                    <input id="job_number_${enc}" type="text" value="${escapeHtml(jobNumber)}" placeholder="YY.#####.##"
+                        style="width:120px; padding:6px 8px; border:1px solid var(--input-border); border-radius:6px; background:var(--input-bg); color:var(--text-primary);" />
+                    <button class="btn btn-small" type="button" data-job-name="${enc}"
+                        onclick="saveJobNumber(decodeURIComponent(this.dataset.jobName),'job_number_'+this.dataset.jobName)">Save</button>
+                </div>
+            </td>`;
+        }
+
+        function buildEstimateCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const estimateNumber = String(job.estimate_number || '').trim();
+            return `<td data-col-cell="estimate">
+                <div style="display:flex; gap:6px; align-items:center; min-width:160px;">
+                    <input id="estimate_number_${enc}" type="text" value="${escapeHtml(estimateNumber)}" placeholder="Estimate #"
+                        style="width:110px; padding:6px 8px; border:1px solid var(--input-border); border-radius:6px; background:var(--input-bg); color:var(--text-primary);" />
+                    <button class="btn btn-small" type="button" data-job-name="${enc}"
+                        onclick="saveEstimateNumber(decodeURIComponent(this.dataset.jobName),'estimate_number_'+this.dataset.jobName)">Save</button>
+                </div>
+            </td>`;
+        }
+
+        function buildClientLinksCell(job) {
+            const clients = Array.isArray(job.clients) ? job.clients : [];
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const pills = clients.map(c => {
+                const href = c.id ? `/crm?client_id=${encodeURIComponent(c.id)}` : '/crm';
+                return `<a class="client-pill" href="${href}" title="${escapeHtml(c.name || '')}">${escapeHtml(c.name || 'Client')}</a>`;
+            }).join('');
+            return `<td data-col-cell="client_links">
+                <div style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;">
+                    ${pills || '<span class="card-no-link">&mdash;</span>'}
+                    <button class="btn btn-small" style="font-size:10px;padding:2px 6px;" title="Link client" onclick="showJobClientPicker(decodeURIComponent('${enc}'), this)">+ Client</button>
+                </div>
+            </td>`;
+        }
+
+        function buildChatCell(job) {
+            if (!job.has_channel) return `<td data-col-cell="chat"><span class="card-no-link">&mdash;</span></td>`;
+            const channelId = job.channel_id || 0;
+            const href = channelId ? `/chat#c=${channelId}` : '/chat';
+            return `<td data-col-cell="chat"><a class="chat-link" href="${href}">&#x1F4AC; Open</a></td>`;
+        }
+
+        function buildCardStatusCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            if (!CARD_STATUS_BOARD_ID) {
+                return `<td data-col-cell="card_status"><span class="card-no-link">&mdash;</span></td>`;
+            }
+            const info = CARD_STATUS_MAP[name.toLowerCase()];
+            if (!info) {
+                return `<td data-col-cell="card_status">
+                    <button class="btn btn-small" style="font-size:11px;" onclick="createCardForJob(decodeURIComponent('${enc}'))">+ Add Card</button>
+                </td>`;
+            }
+            const colName = BOARD_COLUMNS.find(c => c.id === info.column_id)?.name || info.column_name || '?';
+            const boardHref = `/boards#board=${CARD_STATUS_BOARD_ID}&card=${info.card_id}`;
+            const moveOpts = BOARD_COLUMNS.map(col =>
+                `<option value="${col.id}" ${col.id === info.column_id ? 'selected' : ''}>${escapeHtml(col.name)}</option>`
+            ).join('');
+            return `<td data-col-cell="card_status" style="min-width:160px;">
+                <a class="client-pill" href="${boardHref}" style="margin-bottom:4px;display:inline-flex;">&#x1F4CC; ${escapeHtml(colName)}</a>
+                <select class="card-status-select" style="display:block;margin-top:2px;"
+                    onchange="moveCard(${info.card_id}, parseInt(this.value), decodeURIComponent('${enc}'), this)">
+                    ${moveOpts}
+                </select>
+            </td>`;
+        }
+
+        function buildActionsCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const isArchived = !!job.hidden;
+            const scanUrl = `/scans?job_name=${encodeURIComponent(name)}`;
+            return `<td data-col-cell="actions">
+                <div class="actions">
+                    <a class="btn btn-small" href="${scanUrl}">Scan Log</a>
+                    ${isArchived
+                        ? `<button class="btn btn-success btn-small" type="button" data-job-name="${enc}" onclick="runBulkAction('restore', decodeURIComponent(this.dataset.jobName))">Restore</button>`
+                        : `<button class="btn btn-warning btn-small" type="button" data-job-name="${enc}" onclick="runBulkAction('archive', decodeURIComponent(this.dataset.jobName))">Archive</button>`}
+                    <button class="btn btn-danger btn-small" type="button" data-job-name="${enc}" onclick="runBulkAction('delete', decodeURIComponent(this.dataset.jobName))">Delete</button>
+                </div>
+            </td>`;
+        }
+
+        function buildCellHtml(col, job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const isArchived = !!job.hidden;
+            const hidden = hiddenCols.has(col) ? ' style="display:none;"' : '';
+            let html;
+            switch (col) {
+                case 'job':         html = buildJobCell(job); break;
+                case 'number':      html = buildNumberCell(job); break;
+                case 'estimate':    html = buildEstimateCell(job); break;
+                case 'status':      html = `<td data-col-cell="status"><span class="status-pill ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span></td>`; break;
+                case 'scans':       html = `<td data-col-cell="scans">${Number(job.scan_count || 0).toLocaleString()}</td>`; break;
+                case 'last_scan':   html = `<td data-col-cell="last_scan">${escapeHtml(formatDateTime(job.last_scan_at))}</td>`; break;
+                case 'client_links':html = buildClientLinksCell(job); break;
+                case 'chat':        html = buildChatCell(job); break;
+                case 'recent':      html = `<td data-col-cell="recent">${job.appears_in_recent ? 'Yes' : '\u2014'}</td>`; break;
+                case 'job_type':    html = buildJobTypeCell(job); break;
+                case 'card_status': html = buildCardStatusCell(job); break;
+                case 'actions':     html = buildActionsCell(job); break;
+                default: {
+                    // Custom column
+                    const cc = CUSTOM_COLS.find(c => c.key === col);
+                    if (!cc) { html = `<td data-col-cell="${col}"></td>`; break; }
+                    const val = (CUSTOM_DATA[name.toLowerCase()] || {})[col] || '';
+                    if (cc.type === 'url') {
+                        html = `<td data-col-cell="${col}">
+                            <input type="url" class="custom-cell-input" value="${escapeHtml(val)}" placeholder="https://…"
+                                onblur="saveCustomCell('${enc}','${col}',this.value)"
+                                onkeydown="if(event.key==='Enter')this.blur();" style="width:100%;min-width:140px;"/>
+                            ${val ? `<a href="${escapeHtml(val)}" target="_blank" style="font-size:10px;">&#x1F517;</a>` : ''}
+                        </td>`;
+                    } else if (cc.type === 'date') {
+                        html = `<td data-col-cell="${col}">
+                            <input type="date" class="custom-cell-input" value="${escapeHtml(val)}"
+                                onblur="saveCustomCell('${enc}','${col}',this.value)"
+                                onchange="saveCustomCell('${enc}','${col}',this.value)" style="width:100%;min-width:120px;"/>
+                        </td>`;
+                    } else {
+                        html = `<td data-col-cell="${col}">
+                            <input type="text" class="custom-cell-input" value="${escapeHtml(val)}" placeholder="—"
+                                onblur="saveCustomCell('${enc}','${col}',this.value)"
+                                onkeydown="if(event.key==='Enter')this.blur();" style="width:100%;min-width:120px;"/>
+                        </td>`;
+                    }
+                }
+            }
+            // Apply visibility to the td — parse out the opening tag and inject style
+            if (hidden && html) {
+                html = html.replace(/^<td/, `<td${hidden}`);
+            }
+            return html;
+        }
+
+        function renderJobs() {
+            const tbody = document.getElementById('jobsTableBody');
+            if (!tbody) return;
+            pageSize = parseInt(document.getElementById('pageSizeSel')?.value || '100', 10) || 100;
+            const totalPages = Math.max(1, Math.ceil(FILTERED_JOBS.length / pageSize));
+            currentPage = Math.min(Math.max(1, currentPage), totalPages);
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            VISIBLE_JOBS = FILTERED_JOBS.slice(start, end);
+
+            document.getElementById('listMeta').textContent = `Showing ${FILTERED_JOBS.length.toLocaleString()} jobs`;
+            document.getElementById('pageMeta').textContent = `Page ${currentPage} / ${totalPages}`;
+            document.getElementById('chkAll').checked = VISIBLE_JOBS.length > 0 && VISIBLE_JOBS.every(job => selectedNames.has(job.name));
+
+            const colCount = colOrder.length + 2; // +2 for checkbox + ordered cols
+            if (!VISIBLE_JOBS.length) {
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty">No jobs match the current filters.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = VISIBLE_JOBS.map(job => {
+                const name = String(job.name || '');
+                const enc = encodeURIComponent(name);
+                const selected = selectedNames.has(name);
+                const checkCell = `<td><input type="checkbox" data-job-name="${enc}" ${selected ? 'checked' : ''} onchange="toggleRowSelection(decodeURIComponent(this.dataset.jobName), this.checked)"></td>`;
+                const cells = colOrder.map(col => buildCellHtml(col, job)).join('');
+                return `<tr class="${selected ? 'row-selected' : ''}">${checkCell}${cells}</tr>`;
+            }).join('');
+        }
+
+        async function saveJobNumber(jobName, inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const jobNumber = (input.value || '').trim();
+            if (jobNumber && !/^\d{2}\.\d{5}\.\d{2}$/.test(jobNumber)) {
+                showMessage('Job number must be in format YY.#####.## (example: 26.50015.01).', 'error');
+                return;
+            }
+            try {
+                const res = await fetch('/api/chat/jobs/number', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_name: jobName, job_number: jobNumber }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to save job number');
+                const idx = ALL_JOBS.findIndex(j => String(j.name || '').toLowerCase() === String(jobName || '').toLowerCase());
+                if (idx >= 0) {
+                    ALL_JOBS[idx].job_number = jobNumber;
+                    ALL_JOBS[idx].display_name = data.display_name || (jobNumber ? `${jobName} ${jobNumber}` : jobName);
+                }
+                showMessage(`Saved job number for ${jobName}.`, 'success');
+                applyFilters(false);
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        async function saveEstimateNumber(jobName, inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const estimateNumber = (input.value || '').trim();
+            try {
+                const res = await fetch('/api/chat/jobs/estimate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_name: jobName, estimate_number: estimateNumber }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to save estimate number');
+                const idx = ALL_JOBS.findIndex(j => String(j.name || '').toLowerCase() === String(jobName || '').toLowerCase());
+                if (idx >= 0) ALL_JOBS[idx].estimate_number = estimateNumber;
+                showMessage(`Saved estimate number for ${jobName}.`, 'success');
+                applyFilters(false);
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function startNameEdit(jobName) {
+            const encodedName = encodeURIComponent(jobName);
+            document.getElementById(`nameDisplay_${encodedName}`)?.style.setProperty('display', 'none');
+            document.getElementById(`nameEdit_${encodedName}`)?.style.removeProperty('display');
+            document.getElementById(`job_name_edit_${encodedName}`)?.focus();
+        }
+
+        function cancelNameEdit(jobName) {
+            const encodedName = encodeURIComponent(jobName);
+            document.getElementById(`nameDisplay_${encodedName}`)?.style.removeProperty('display');
+            document.getElementById(`nameEdit_${encodedName}`)?.style.setProperty('display', 'none');
+        }
+
+        async function saveJobName(jobName, inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const displayOverride = (input.value || '').trim();
+            try {
+                const res = await fetch('/api/chat/jobs/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_name: jobName, display_override: displayOverride }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to rename job');
+                const idx = ALL_JOBS.findIndex(j => String(j.name || '').toLowerCase() === String(jobName || '').toLowerCase());
+                if (idx >= 0) ALL_JOBS[idx].display_override = displayOverride;
+                cancelNameEdit(jobName);
+                showMessage(`Renamed "${jobName}".`, 'success');
+                applyFilters(false);
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        async function saveJobAddress(jobName, inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const address = (input.value || '').trim();
+            const idx = ALL_JOBS.findIndex(j => String(j.name || '').toLowerCase() === String(jobName || '').toLowerCase());
+            if (idx >= 0 && ALL_JOBS[idx].address === address) return; // No change
+            try {
+                const res = await fetch('/api/chat/jobs/address', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_name: jobName, address }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to save address');
+                if (idx >= 0) ALL_JOBS[idx].address = address;
+                showMessage(`Address saved for "${jobName}".`, 'success');
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function toggleAddJobForm() {
+            const form = document.getElementById('addJobForm');
+            if (!form) return;
+            const visible = form.style.display !== 'none';
+            form.style.display = visible ? 'none' : 'flex';
+            if (!visible) {
+                document.getElementById('newJobName')?.focus();
+                populateAddJobClientDropdown();
+            }
+        }
+
+        async function addJob() {
+            const nameInput = document.getElementById('newJobName');
+            const addrInput = document.getElementById('newJobAddress');
+            const clientSel = document.getElementById('newJobClientSel');
+            const jobName = (nameInput?.value || '').trim();
+            const address = (addrInput?.value || '').trim();
+            const selectedClientIds = clientSel ? Array.from(clientSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean) : [];
+            if (!jobName) { showMessage('Job name is required.', 'error'); return; }
+            try {
+                const res = await fetch('/api/chat/jobs/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_name: jobName, address }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to add job');
+                // Link selected clients
+                for (const cid of selectedClientIds) {
+                    await linkClientToJob(cid, jobName).catch(() => {});
+                }
+                if (nameInput) nameInput.value = '';
+                if (addrInput) addrInput.value = '';
+                if (clientSel) Array.from(clientSel.options).forEach(o => o.selected = false);
+                toggleAddJobForm();
+                showMessage(`Added job "${jobName}".`, 'success');
+                await loadJobs();
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function saveTablePrefs() {
+            try {
+                localStorage.setItem('jobs_col_order', JSON.stringify(colOrder));
+                localStorage.setItem('jobs_col_widths', JSON.stringify(colWidths));
+                localStorage.setItem('jobs_hidden_cols', JSON.stringify(Array.from(hiddenCols)));
+                localStorage.setItem('jobs_custom_cols', JSON.stringify(CUSTOM_COLS));
+                localStorage.setItem('jobs_custom_data', JSON.stringify(CUSTOM_DATA));
+                localStorage.setItem('jobs_job_types', JSON.stringify(JOB_TYPES));
+                localStorage.setItem('jobs_job_type_data', JSON.stringify(JOB_TYPE_DATA));
+            } catch {}
+        }
+
+        function loadTablePrefs() {
+            try {
+                // Custom cols first (needed to validate colOrder)
+                const savedCustomCols = JSON.parse(localStorage.getItem('jobs_custom_cols') || 'null');
+                if (Array.isArray(savedCustomCols)) CUSTOM_COLS = savedCustomCols.filter(c => c.key && c.label);
+                const savedCustomData = JSON.parse(localStorage.getItem('jobs_custom_data') || 'null');
+                if (savedCustomData && typeof savedCustomData === 'object') CUSTOM_DATA = savedCustomData;
+                const savedJobTypes = JSON.parse(localStorage.getItem('jobs_job_types') || 'null');
+                if (Array.isArray(savedJobTypes) && savedJobTypes.length) JOB_TYPES = savedJobTypes;
+                const savedJobTypeData = JSON.parse(localStorage.getItem('jobs_job_type_data') || 'null');
+                if (savedJobTypeData && typeof savedJobTypeData === 'object') JOB_TYPE_DATA = savedJobTypeData;
+
+                const allColKeys = [...KNOWN_COLS, ...CUSTOM_COLS.map(c => c.key)];
+                const savedOrder = JSON.parse(localStorage.getItem('jobs_col_order') || 'null');
+                if (Array.isArray(savedOrder) && savedOrder.length) {
+                    const valid = savedOrder.filter(k => allColKeys.includes(k));
+                    const missing = allColKeys.filter(k => !valid.includes(k));
+                    colOrder = [...valid, ...missing];
+                } else {
+                    colOrder = [...allColKeys];
+                }
+                const widths = JSON.parse(localStorage.getItem('jobs_col_widths') || 'null');
+                if (widths && typeof widths === 'object') colWidths = widths;
+                const savedHidden = JSON.parse(localStorage.getItem('jobs_hidden_cols') || 'null');
+                if (Array.isArray(savedHidden)) hiddenCols = new Set(savedHidden);
+            } catch {}
+        }
+
+        function applyTableOrder() {
+            const tr = document.getElementById('tableHeaderRow');
+            if (!tr) return;
+
+            // Inject/update custom column headers
+            CUSTOM_COLS.forEach(cc => {
+                let th = tr.querySelector(`th[data-col="${cc.key}"]`);
+                if (!th) {
+                    th = document.createElement('th');
+                    th.setAttribute('data-col', cc.key);
+                    th.className = 'sortable-th';
+                    th.setAttribute('onclick', `toggleJobSort('${cc.key}')`);
+                    th.innerHTML = `<span class="sortable-head">${escapeHtml(cc.label)} <span class="sort-indicator" id="sort_${cc.key}"></span><button class="btn-icon" title="Delete column" onclick="event.stopPropagation();deleteCustomCol('${cc.key}')" style="margin-left:4px;font-size:10px;opacity:0.6;">✕</button></span>`;
+                    tr.insertBefore(th, tr.querySelector('th[data-col="actions"]'));
+                }
+            });
+            // Remove stale custom headers
+            tr.querySelectorAll('th[data-col]').forEach(th => {
+                const k = th.getAttribute('data-col');
+                if (!KNOWN_COLS.includes(k) && !CUSTOM_COLS.find(c => c.key === k)) th.remove();
+            });
+
+            // Re-order
+            const ths = Array.from(tr.querySelectorAll('th'));
+            colOrder.forEach(key => {
+                const th = ths.find(t => t.getAttribute('data-col') === key);
+                if (th) tr.appendChild(th);
+            });
+
+            // Apply visibility
+            tr.querySelectorAll('th[data-col]').forEach(th => {
+                th.style.display = hiddenCols.has(th.getAttribute('data-col')) ? 'none' : '';
+            });
+
+            updateJobSortIndicators();
+            renderJobs();
+        }
+
+        async function loadClients() {
+            try {
+                const res = await fetch('/api/clients/with_jobs?limit=2000');
+                const data = await res.json().catch(() => ({}));
+                const clients = Array.isArray(data.clients) ? data.clients : [];
+                ALL_CLIENTS = clients.map(c => ({ id: c.id, name: String(c.name || c.company || '') }))
+                    .filter(c => c.name)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                CLIENT_MAP = {};
+                for (const c of clients) {
+                    const jobs = Array.isArray(c.jobs) ? c.jobs : [];
+                    const clientEntry = { id: c.id, name: String(c.name || c.company || '') };
+                    for (const jn of jobs) {
+                        const key = String(jn || '').trim().toLowerCase();
+                        if (!key) continue;
+                        if (!CLIENT_MAP[key]) CLIENT_MAP[key] = [];
+                        CLIENT_MAP[key].push(clientEntry);
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not load clients:', err);
+            }
+        }
+
+        function populateAddJobClientDropdown() {
+            const sel = document.getElementById('newJobClientSel');
+            if (!sel) return;
+            if (ALL_CLIENTS.length === 0) return;
+            sel.innerHTML = ALL_CLIENTS.map(c =>
+                `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+            ).join('');
+        }
+
+        function filterAddJobClients(q) {
+            const sel = document.getElementById('newJobClientSel');
+            if (!sel) return;
+            const lower = q.toLowerCase();
+            Array.from(sel.options).forEach(o => {
+                o.style.display = o.text.toLowerCase().includes(lower) ? '' : 'none';
+            });
+        }
+
+        async function linkClientToJob(clientId, jobName) {
+            const res = await fetch(`/api/clients/${clientId}/jobs/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_name: jobName }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.error) throw new Error(data.error || 'Failed to link client');
+            return data;
+        }
+
+        function showJobClientPicker(jobName, btnEl) {
+            // Remove any existing picker
+            document.querySelectorAll('.job-client-picker').forEach(el => el.remove());
+            if (!ALL_CLIENTS.length) { showMessage('Clients not loaded yet.', 'error'); return; }
+            const picker = document.createElement('div');
+            picker.className = 'job-client-picker';
+            picker.style.cssText = 'position:absolute;z-index:9999;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:10px;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.3);';
+            picker.innerHTML = `
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Link Client to "${escapeHtml(jobName)}"</div>
+                <input type="text" id="clientPickerSearch" placeholder="Search clients…" style="width:100%;margin-bottom:6px;padding:5px 8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);" />
+                <select id="clientPickerSel" size="5" style="width:100%;padding:4px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--text-primary);margin-bottom:6px;">
+                    ${ALL_CLIENTS.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+                </select>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn btn-success btn-small" onclick="confirmLinkClient('${encodeURIComponent(jobName)}')">Link</button>
+                    <button class="btn btn-secondary btn-small" onclick="this.closest('.job-client-picker').remove()">Cancel</button>
+                </div>`;
+            // Position near button
+            const rect = btnEl.getBoundingClientRect();
+            picker.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+            picker.style.left = (rect.left + window.scrollX) + 'px';
+            document.body.appendChild(picker);
+            // Filter
+            document.getElementById('clientPickerSearch').addEventListener('input', function() {
+                const q = this.value.toLowerCase();
+                const sel = document.getElementById('clientPickerSel');
+                Array.from(sel.options).forEach(o => { o.style.display = o.text.toLowerCase().includes(q) ? '' : 'none'; });
+            });
+            document.getElementById('clientPickerSearch').focus();
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', function closeP(e) {
+                    if (!picker.contains(e.target) && e.target !== btnEl) { picker.remove(); document.removeEventListener('click', closeP); }
+                });
+            }, 100);
+        }
+
+        async function confirmLinkClient(encodedJobName) {
+            const jobName = decodeURIComponent(encodedJobName);
+            const sel = document.getElementById('clientPickerSel');
+            const clientId = sel?.value ? parseInt(sel.value) : null;
+            if (!clientId) { showMessage('Select a client first.', 'error'); return; }
+            document.querySelector('.job-client-picker')?.remove();
+            try {
+                await linkClientToJob(clientId, jobName);
+                showMessage(`Client linked to "${jobName}".`, 'success');
+                await loadJobs();
+            } catch (err) {
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function buildJobTypeCell(job) {
+            const name = String(job.name || '');
+            const enc = encodeURIComponent(name);
+            const current = JOB_TYPE_DATA[name.toLowerCase()] || '';
+            const opts = ['', ...JOB_TYPES].map(t =>
+                `<option value="${escapeHtml(t)}" ${t === current ? 'selected' : ''}>${t ? escapeHtml(t) : '\u2014 None \u2014'}</option>`
+            ).join('');
+            return `<td data-col-cell="job_type">
+                <select class="job-type-select" onchange="saveJobType('${enc}', this.value)">${opts}</select>
+            </td>`;
+        }
+
+        function saveJobType(encodedName, value) {
+            const name = decodeURIComponent(encodedName).toLowerCase();
+            JOB_TYPE_DATA[name] = value || '';
+            saveTablePrefs();
+        }
+
+        function saveCustomCell(encodedName, colKey, value) {
+            const name = decodeURIComponent(encodedName).toLowerCase();
+            if (!CUSTOM_DATA[name]) CUSTOM_DATA[name] = {};
+            CUSTOM_DATA[name][colKey] = value || '';
+            saveTablePrefs();
+        }
+
+        async function loadBoards() {
+            try {
+                const res = await fetch('/api/boards');
+                const data = await res.json().catch(() => ({}));
+                BOARDS_DATA = Array.isArray(data.boards) ? data.boards : [];
+                const sel = document.getElementById('cardBoardSel');
+                if (!sel) return;
+                // Keep existing value if any
+                const prev = sel.value;
+                sel.innerHTML = '<option value="">\u2014 None \u2014</option>' +
+                    BOARDS_DATA.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+                if (prev && BOARDS_DATA.find(b => String(b.id) === prev)) {
+                    sel.value = prev;
+                } else {
+                    // Try to restore from localStorage
+                    const saved = localStorage.getItem('jobs_card_status_board');
+                    if (saved && BOARDS_DATA.find(b => String(b.id) === saved)) {
+                        sel.value = saved;
+                    }
+                }
+                if (sel.value) {
+                    CARD_STATUS_BOARD_ID = parseInt(sel.value);
+                    await loadBoardCards(CARD_STATUS_BOARD_ID);
+                }
+            } catch (err) {
+                console.warn('Could not load boards:', err);
+            }
+        }
+
+        async function loadBoardCards(boardId) {
+            CARD_STATUS_MAP = {};
+            BOARD_COLUMNS = [];
+            if (!boardId) { renderJobs(); return; }
+            try {
+                const res = await fetch(`/api/boards/${boardId}`);
+                const data = await res.json().catch(() => ({}));
+                BOARD_COLUMNS = Array.isArray(data.columns) ? data.columns.map(c => ({ id: c.id, name: c.name })) : [];
+                const cards = Array.isArray(data.cards) ? data.cards : [];
+                // Build column lookup
+                const colById = {};
+                BOARD_COLUMNS.forEach(c => { colById[c.id] = c.name; });
+                // Map job_name → most recent card (prefer exact match)
+                for (const card of cards) {
+                    const jn = String(card.job_name || card.title || '').trim();
+                    if (!jn) continue;
+                    const key = jn.toLowerCase();
+                    if (!CARD_STATUS_MAP[key]) {
+                        CARD_STATUS_MAP[key] = {
+                            card_id: card.id,
+                            column_id: card.column_id,
+                            column_name: colById[card.column_id] || '?',
+                        };
+                    }
+                }
+                renderJobs();
+            } catch (err) {
+                console.warn('Could not load board cards:', err);
+            }
+        }
+
+        async function onCardBoardChange() {
+            const sel = document.getElementById('cardBoardSel');
+            const boardId = sel?.value ? parseInt(sel.value) : null;
+            CARD_STATUS_BOARD_ID = boardId;
+            if (boardId) {
+                localStorage.setItem('jobs_card_status_board', String(boardId));
+                await loadBoardCards(boardId);
+            } else {
+                localStorage.removeItem('jobs_card_status_board');
+                CARD_STATUS_MAP = {};
+                BOARD_COLUMNS = [];
+                renderJobs();
+            }
+        }
+
+        async function moveCard(cardId, toColumnId, jobName, selectEl) {
+            try {
+                const res = await fetch(`/api/boards/cards/${cardId}/move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to_column_id: toColumnId }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to move card');
+                // Update local map
+                const key = String(jobName || '').toLowerCase();
+                if (CARD_STATUS_MAP[key]) {
+                    CARD_STATUS_MAP[key].column_id = toColumnId;
+                    CARD_STATUS_MAP[key].column_name = BOARD_COLUMNS.find(c => c.id === toColumnId)?.name || '?';
+                }
+                if (selectEl) selectEl.classList.add('has-card');
+                showMessage(`Card moved to "${BOARD_COLUMNS.find(c => c.id === toColumnId)?.name || ''}" for "${jobName}".`, 'success');
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+                // Revert visual
+                renderJobs();
+            }
+        }
+
+        async function createCardForJob(jobName) {
+            if (!CARD_STATUS_BOARD_ID || !BOARD_COLUMNS.length) {
+                showMessage('Select a Card Status Board first.', 'error');
+                return;
+            }
+            const firstCol = BOARD_COLUMNS[0];
+            try {
+                // First get the board's first column id
+                const res = await fetch(`/api/boards/${CARD_STATUS_BOARD_ID}/cards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        column_id: firstCol.id,
+                        title: jobName,
+                        job_name: jobName,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Failed to create card');
+                showMessage(`Card created for "${jobName}" in "${firstCol.name}".`, 'success');
+                await loadBoardCards(CARD_STATUS_BOARD_ID);
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function initTableResizing() {
+            const tr = document.getElementById('tableHeaderRow');
+            if (!tr) return;
+            tr.querySelectorAll('th[data-col]').forEach(th => {
+                const colKey = th.getAttribute('data-col');
+                const handle = document.createElement('span');
+                handle.className = 'drag-handle';
+                handle.innerHTML = '⋮⋮';
+                th.prepend(handle);
+
+                const resizer = document.createElement('div');
+                resizer.className = 'resizer';
+                th.appendChild(resizer);
+
+                if (colWidths[colKey]) th.style.width = colWidths[colKey];
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', e => {
+                    startX = e.pageX; startWidth = th.offsetWidth;
+                    const onMove = e => { const w = startWidth + (e.pageX - startX); th.style.width = w + 'px'; colWidths[colKey] = w + 'px'; };
+                    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); saveTablePrefs(); };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                    e.stopPropagation(); e.preventDefault();
+                });
+
+                handle.draggable = true;
+                handle.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('text/plain', colKey);
+                    e.dataTransfer.effectAllowed = 'move';
+                    th.classList.add('dragging');
+                    e.stopPropagation();
+                });
+                handle.addEventListener('dragend', () => th.classList.remove('dragging'));
+                th.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+                th.addEventListener('drop', e => {
+                    e.preventDefault();
+                    const from = e.dataTransfer.getData('text/plain');
+                    const to = colKey;
+                    if (from === to) return;
+                    const fi = colOrder.indexOf(from), ti = colOrder.indexOf(to);
+                    colOrder.splice(fi, 1); colOrder.splice(ti, 0, from);
+                    saveTablePrefs();
+                    applyTableOrder();
+                });
+                resizer.addEventListener('mousedown', e => e.stopPropagation());
+            });
+        }
+
+        function updateSelectedCount() {
+            const count = `${selectedNames.size} selected`;
+            document.getElementById('selectedCount').textContent = count;
+        }
+
+        function toggleRowSelection(name, checked) {
+            if (checked) selectedNames.add(name);
+            else selectedNames.delete(name);
+            updateSelectedCount();
+            renderJobs();
+        }
+
+        function toggleAllCheckbox(checked) {
+            VISIBLE_JOBS.forEach(job => {
+                if (checked) selectedNames.add(job.name);
+                else selectedNames.delete(job.name);
+            });
+            updateSelectedCount();
+            renderJobs();
+        }
+
+        function selectAllVisible() {
+            VISIBLE_JOBS.forEach(job => selectedNames.add(job.name));
+            updateSelectedCount();
+            renderJobs();
+        }
+
+        function clearSelection() {
+            selectedNames.clear();
+            updateSelectedCount();
+            renderJobs();
+        }
+
+        async function runBulkAction(action, singleName = null) {
+            const names = singleName ? [singleName] : Array.from(selectedNames);
+            if (!names.length) {
+                showMessage('Select at least one job first.', 'error');
+                return;
+            }
+            const targetJobName = (document.getElementById('mergeTargetInput')?.value || '').trim();
+            if (action === 'merge' && !targetJobName) {
+                showMessage('Enter a merge target job name first.', 'error');
+                document.getElementById('mergeTargetInput')?.focus();
+                return;
+            }
+            const isDeleteAction = action === 'delete' || action === 'cleanup';
+            const isMergeAction = action === 'merge';
+            const label = isDeleteAction
+                ? `Delete ${names.length} job${names.length === 1 ? '' : 's'} permanently? This purges scans and removes chat/client job links.`
+                : isMergeAction
+                    ? `Merge ${names.length} job${names.length === 1 ? '' : 's'} into "${targetJobName}"?`
+                    : `${action === 'archive' ? 'Archive' : 'Restore'} ${names.length} job${names.length === 1 ? '' : 's'}?`;
+            if (!window.confirm(label)) return;
+            try {
+                const res = await fetch('/api/chat/jobs/manage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, job_names: names, target_job_name: isMergeAction ? targetJobName : undefined }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || 'Action failed');
+                if (singleName) selectedNames.delete(singleName);
+                else if (action !== 'restore') names.forEach(name => selectedNames.delete(name));
+                if (isDeleteAction) {
+                    const scanCount = Number(data.deleted_scans || 0);
+                    const linkCount = Number(data.deleted_client_links || 0);
+                    const channelCount = Number(data.deleted_channels || 0);
+                    showMessage(`Cleaned up ${names.length} job${names.length === 1 ? '' : 's'} (scans: ${scanCount}, client links: ${linkCount}, chat channels: ${channelCount}).`, 'success');
+                } else if (isMergeAction) {
+                    const counts = data.merge_counts || {};
+                    const mergedCount = Array.isArray(data.job_names) ? data.job_names.length : names.length;
+                    showMessage(`Merged ${mergedCount} job${mergedCount === 1 ? '' : 's'} into "${data.target_job_name || targetJobName}" (rows updated: ${Number(counts.updated_rows || 0)}).`, 'success');
+                } else {
+                    showMessage(`${names.length} job${names.length === 1 ? '' : 's'} updated.`, 'success');
+                }
+                if (isMergeAction) {
+                    const targetInput = document.getElementById('mergeTargetInput');
+                    if (targetInput) targetInput.value = data.target_job_name || targetJobName;
+                }
+                await loadJobs();
+            } catch (err) {
+                console.error(err);
+                showMessage(err.message || String(err), 'error');
+            }
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage -= 1;
+                renderJobs();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.max(1, Math.ceil(FILTERED_JOBS.length / pageSize));
+            if (currentPage < totalPages) {
+                currentPage += 1;
+                renderJobs();
+            }
+        }
+
+        function onPageSizeChange() {
+            currentPage = 1;
+            renderJobs();
+        }
+
+        function initStickyOffsets() {
+            const bulkbar = document.getElementById('bulkbar');
+            if (!bulkbar) return;
+            const apply = () => {
+                document.documentElement.style.setProperty('--jobs-bulkbar-height', `${bulkbar.offsetHeight}px`);
+            };
+            apply();
+            window.addEventListener('resize', apply);
+        }
+
+        function toggleColumnManager() {
+            const panel = document.getElementById('columnManagerPanel');
+            if (!panel) return;
+            const visible = panel.style.display !== 'none';
+            panel.style.display = visible ? 'none' : 'block';
+            if (!visible) renderColumnManagerPanel();
+        }
+
+        function renderColumnManagerPanel() {
+            const list = document.getElementById('colMgrList');
+            if (!list) return;
+            const BUILTIN_LABELS = {
+                job: 'Job', number: 'Job Number', estimate: 'Estimate #', status: 'Status', job_type: 'Job Type', scans: 'Scans',
+                last_scan: 'Last Scan', client_links: 'Clients', chat: 'Chat',
+                recent: 'Recent', card_status: 'Card Status', actions: 'Actions'
+            };
+            const allCols = [
+                ...KNOWN_COLS.map(k => ({ key: k, label: BUILTIN_LABELS[k] || k, custom: false })),
+                ...CUSTOM_COLS.map(c => ({ key: c.key, label: c.label, custom: true })),
+            ];
+            list.innerHTML = allCols.map(c => `
+                <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;">
+                    <input type="checkbox" ${hiddenCols.has(c.key) ? '' : 'checked'}
+                        onchange="toggleColVisibility('${c.key}', this.checked)" />
+                    <span>${escapeHtml(c.label)}</span>
+                    ${c.custom ? `<button class="btn btn-danger btn-small" style="margin-left:auto;font-size:10px;" onclick="deleteCustomCol('${c.key}')">Delete</button>` : ''}
+                </label>`).join('');
+            renderJobTypeOptions();
+        }
+
+        function renderJobTypeOptions() {
+            const el = document.getElementById('jobTypeOptionsList');
+            if (!el) return;
+            el.innerHTML = JOB_TYPES.map((t, i) => `
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+                    <input type="text" value="${escapeHtml(t)}"
+                        style="flex:1;padding:4px 8px;border:1px solid var(--input-border);border-radius:5px;background:var(--input-bg);color:var(--text-primary);font-size:12px;"
+                        onblur="renameJobTypeOption(${i}, this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur();" />
+                    <button class="btn btn-danger btn-small" style="font-size:10px;" onclick="removeJobTypeOption(${i})">&#x2715;</button>
+                </div>`).join('') || '<span style="font-size:12px;color:var(--text-muted);">No types defined.</span>';
+        }
+
+        function addJobTypeOption() {
+            const input = document.getElementById('newJobTypeInput');
+            const label = (input?.value || '').trim();
+            if (!label) return;
+            if (!JOB_TYPES.includes(label)) {
+                JOB_TYPES.push(label);
+                saveTablePrefs();
+                renderJobs();
+            }
+            if (input) input.value = '';
+            renderJobTypeOptions();
+        }
+
+        function removeJobTypeOption(idx) {
+            JOB_TYPES.splice(idx, 1);
+            saveTablePrefs();
+            renderJobTypeOptions();
+            renderJobs();
+        }
+
+        function renameJobTypeOption(idx, newLabel) {
+            newLabel = (newLabel || '').trim();
+            if (!newLabel || newLabel === JOB_TYPES[idx]) return;
+            const old = JOB_TYPES[idx];
+            JOB_TYPES[idx] = newLabel;
+            for (const k of Object.keys(JOB_TYPE_DATA)) {
+                if (JOB_TYPE_DATA[k] === old) JOB_TYPE_DATA[k] = newLabel;
+            }
+            saveTablePrefs();
+            renderJobTypeOptions();
+            renderJobs();
+        }
+
+        function toggleColVisibility(key, visible) {
+            if (visible) hiddenCols.delete(key);
+            else hiddenCols.add(key);
+            saveTablePrefs();
+            // Apply to header
+            const tr = document.getElementById('tableHeaderRow');
+            if (tr) {
+                const th = tr.querySelector(`th[data-col="${key}"]`);
+                if (th) th.style.display = visible ? '' : 'none';
+            }
+            // Apply to body cells
+            document.querySelectorAll(`td[data-col-cell="${key}"]`).forEach(td => {
+                td.style.display = visible ? '' : 'none';
+            });
+        }
+
+        function addCustomCol() {
+            const labelInput = document.getElementById('newColLabel');
+            const typeSelect = document.getElementById('newColType');
+            const label = (labelInput?.value || '').trim();
+            if (!label) { showMessage('Column name is required.', 'error'); return; }
+            const key = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now();
+            const type = typeSelect?.value || 'text';
+            CUSTOM_COLS.push({ key, label, type });
+            // Add to colOrder before 'actions'
+            const aIdx = colOrder.indexOf('actions');
+            if (aIdx >= 0) colOrder.splice(aIdx, 0, key);
+            else colOrder.push(key);
+            if (labelInput) labelInput.value = '';
+            saveTablePrefs();
+            applyTableOrder();
+            renderColumnManagerPanel();
+        }
+
+        function deleteCustomCol(key) {
+            CUSTOM_COLS = CUSTOM_COLS.filter(c => c.key !== key);
+            colOrder = colOrder.filter(k => k !== key);
+            hiddenCols.delete(key);
+            saveTablePrefs();
+            applyTableOrder();
+            renderColumnManagerPanel();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            updateSelectedCount();
+            initStickyOffsets();
+            syncSortControl();
+            updateJobSortIndicators();
+            loadTablePrefs();
+            initTableResizing();
+            applyTableOrder();
+            // Load all data in parallel, then render
+            Promise.all([loadJobs(), loadClients(), loadBoards()]).then(() => renderJobs());
+        });
+    </script>
+</body>
+</html>

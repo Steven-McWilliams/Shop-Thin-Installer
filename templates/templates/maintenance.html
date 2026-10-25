@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance Tracking - Manufacturing Dashboard</title>
+    <link rel="stylesheet" href="/static/common.css?v=20260408c">
+    <link rel="stylesheet" href="/static/contextual-help.css?v=20260118b">
+    <link rel="stylesheet" href="/static/mobile-nav.css?v=20260118">
+    <script src="/static/theme.js?v=20260416a"></script>
+    <script src="/static/mobile-nav.js?v=20260118"></script>
+    <style>
+        /* Page-specific styles only - common styles are in common.css */
+        
+        .container {
+            max-width: none;
+            margin: 20px 0;
+            padding: 0 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        
+        .stat-card h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--accent-primary);
+        }
+        
+        .filters {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filters select, .filters input {
+            padding: 8px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 5px;
+            font-size: 14px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+        
+        .filters button {
+            padding: 8px 20px;
+            background: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .filters button:hover { background: var(--accent-hover); }
+        
+        .maintenance-table {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            overflow-x: auto;
+        }
+
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .primary-btn {
+            padding: 10px 16px;
+            background: var(--btn-primary-bg);
+            color: var(--btn-primary-text);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .primary-btn:hover { background: var(--accent-hover); }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 1000;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .modal {
+            width: 100%;
+            max-width: 720px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px var(--card-shadow);
+            overflow: visible;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            background: var(--header-bg);
+            color: var(--header-text);
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .modal-header h2 { font-size: 16px; }
+        .modal-body { 
+            padding: 16px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            flex: 1;
+            min-height: 0;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .form-field { display: flex; flex-direction: column; gap: 6px; }
+        .form-field label { font-size: 12px; font-weight: 800; color: var(--text-primary); text-transform: uppercase; letter-spacing: .4px; }
+        .form-field input, .form-field select, .form-field textarea {
+            padding: 10px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+        .form-field textarea { min-height: 90px; resize: vertical; }
+        .modal-footer {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .secondary-btn {
+            padding: 10px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .secondary-btn:hover { background: #5a6268; }
+        
+        /* Mobile modal improvements */
+        @media (max-width: 520px) {
+            .modal-backdrop {
+                padding: 10px;
+                align-items: flex-start;
+                padding-top: 20px;
+            }
+            .modal {
+                max-height: calc(100vh - 40px);
+                border-radius: 10px;
+            }
+            .modal-body {
+                padding: 12px;
+            }
+            .form-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .modal-footer {
+                padding: 12px;
+                position: sticky;
+                bottom: 0;
+            }
+        }
+
+        .thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid #e6e6e6;
+        }
+
+        @media (max-width: 720px) {
+            .form-grid { grid-template-columns: 1fr; }
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            position: relative;
+            user-select: none;
+            text-align: left;
+            padding: 12px;
+            background: var(--table-header-bg);
+            font-weight: 600;
+            color: var(--table-header-text);
+            border-bottom: 2px solid var(--border-color);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        th .resizer {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 5px;
+            background: rgba(0,0,0,0.05);
+            cursor: col-resize;
+            z-index: 1;
+        }
+        th .resizer:hover {
+            background: rgba(0,0,0,0.2);
+        }
+        th.dragging {
+            opacity: 0.5;
+            background: var(--bg-tertiary);
+        }
+        th .drag-handle {
+            cursor: grab;
+            margin-right: 4px;
+            opacity: 0.3;
+        }
+        th:hover .drag-handle {
+            opacity: 1;
+        }
+        th.sortable-th {
+            cursor: pointer;
+        }
+        th .sortable-head {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        th .sort-indicator {
+            min-width: 10px;
+            font-size: 11px;
+            opacity: 0.85;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        
+        tr:hover {
+            background: var(--table-row-hover);
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-maintenance {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .badge-repair {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-inspection {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-tool_change { background: #e2e3ff; color: #2b2f77; }
+        .badge-recut { background: #fde2e2; color: #7a1f1f; }
+        .badge-other { background: var(--bg-tertiary); color: var(--text-primary); }
+        
+        .badge-resolved {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-pending {
+            background: var(--table-warning-bg);
+            color: var(--table-warning-text);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+        
+        .error {
+            background: var(--table-danger-bg);
+            color: var(--table-danger-text);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile Slide Menu -->
+    <div class="mobile_menu_overlay" id="mobile_menu_overlay" onclick="closeMobileMenu()"></div>
+    <div class="mobile_slide_menu" id="mobile_slide_menu">
+      <div class="mobile_menu_header"><h3>Menu</h3><button class="mobile_menu_close" onclick="closeMobileMenu()">×</button></div>
+      <nav class="mobile_menu_nav">
+        <div class="mobile_menu_section">Main</div>
+        <a href="/shop">🏠 Dashboard</a>
+        <button class="mobile_menu_expand" onclick="toggleMobileSubmenu(this)">📊 Reports</button>
+        <div class="mobile_menu_submenu">
+          <a href="/reports">📈 Main Report</a>
+          <a href="/reports#scan_log">📋 Scan Log</a>
+          <a href="/reports#part_search">🔍 Part Search</a>
+          <a href="/reports#detailed">📊 Detailed Reports</a>
+        </div>
+        <a href="/labels">🏷️ Labels</a>
+        <a href="/bins">📦 Bins</a>
+        <div class="mobile_menu_section">Production</div>
+        <a href="/mobile">📱 Mobile Scan</a>
+        <a href="/maintenance" class="active">🔧 Maintenance</a>
+        <a href="/inventory">📦 Inventory</a>
+        <a href="/scans">📝 Scan Log</a>
+        <a href="/tools">🛠️ Tools</a>
+        <a href="/recuts">🔄 Recuts</a>
+        <div class="mobile_menu_section">Office</div>
+        <a href="/chat">💬 Chat</a>
+        <a href="/boards">📋 Boards</a>
+        <a href="/schedule">📅 Schedule</a>
+        <a href="/notifications">🔔 Notifications</a>
+        <div class="mobile_menu_section">System</div>
+        <a href="/stations">⚙️ Admin</a>
+        <a href="/help">❓ Help</a>
+        <a href="/choose_shop">🔄 Switch Shop</a>
+        <a href="#" onclick="openMobileNavSettings(); closeMobileMenu(); return false;">📱 Customize Nav</a>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('logout_form').submit();">🚪 Logout</a>
+      </nav>
+    </div>
+
+    <div class="header">
+        <div class="mobile_header_row">
+          <button class="mobile_hamburger" onclick="openMobileMenu()">☰</button>
+          <h1>🔧 Maintenance</h1>
+        </div>
+        <h1 class="desktop_only">🔧 Maintenance Tracking <span class="help-icon" data-help-topic="maintenance-overview" style="font-size:16px;">?</span></h1>
+        <div class="subtitle desktop_only">Machine maintenance and repair history</div>
+        <div class="nav_primary">
+            <a class="nav_btn active" href="/">Dashboard</a>
+            <a class="nav_btn" href="/reports">Reports</a>
+            <a id="shop_link" class="nav_btn" href="/">Office</a>
+            <a class="nav_btn" href="/labels">Labels</a>
+            <a class="nav_btn" href="/admin">Admin</a>
+            <a class="nav_btn" href="/help">Help</a>
+            <a class="nav_btn ext-link" data-port="5000" data-path="/" href="/bins">Bins</a>
+            <span class="nav_spacer"></span>
+            <button id="auth_btn" class="nav_btn" type="button" onclick="innosawAuthClick()">Login</button>
+        </div>
+    </div>
+    <div class="mobile_bottom_nav" id="mobile_bottom_nav"></div>
+
+    <!-- Edit Maintenance Modal -->
+    <div id="edit-modal" class="modal-backdrop" onclick="closeEditModal(event)" style="display:none;">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Edit Maintenance Log</h2>
+                <button class="secondary-btn" onclick="closeEditModal()">Close</button>
+            </div>
+            <div class="modal-body">
+                <div id="edit-error" class="error" style="display:none;"></div>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Machine</label>
+                        <select id="edit-machine" required>
+                            <option value="">Select...</option>
+                            <option value="CNC">CNC</option>
+                            <option value="Edge">Edge</option>
+                            <option value="Dowel">Dowel</option>
+                            <option value="Sort">Sort</option>
+                            <option value="Pull">Pull</option>
+                            <option value="Assembly">Assembly</option>
+                            <option value="QC">QC</option>
+                            <option value="Wrap">Wrap</option>
+                            <option value="Ship">Ship</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Event Type</label>
+                        <select id="edit-event-type">
+                            <option value="tool_change">Tool Change</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="repair">Repair</option>
+                            <option value="inspection">Inspection</option>
+                            <option value="recut">Recut</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Tool Name / ID</label>
+                        <input id="edit-tool" list="tool-options-edit" placeholder="e.g. 3750 - 3/8 Compression" />
+                        <datalist id="tool-options-edit"></datalist>
+                        <select id="edit-tool-select" style="margin-top:6px; width:100%;">
+                            <option value="">Active tools…</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Operator</label>
+                        <input id="edit-operator" list="operator-options" placeholder="Type to search operators..." autocomplete="off" />
+                    </div>
+                    <div class="form-field">
+                        <label>Reason</label>
+                        <select id="edit-reason">
+                            <option value="scheduled">Scheduled</option>
+                            <option value="unscheduled">Unscheduled</option>
+                            <option value="wear">Wear</option>
+                            <option value="damage">Damage</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Assigned To</label>
+                        <input id="edit-assigned" list="user-options" placeholder="Type to search users/operators..." autocomplete="off" />
+                    </div>
+                    <div class="form-field">
+                        <label>Duration Minutes (optional)</label>
+                        <input id="edit-duration" type="number" step="0.1" placeholder="e.g. 12" />
+                    </div>
+                    <div class="form-field">
+                        <label>Status</label>
+                        <select id="edit-status">
+                            <option value="pending">Pending</option>
+                            <option value="resolved">Resolved</option>
+                        </select>
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label>Description</label>
+                        <textarea id="edit-description" placeholder="What happened? What was changed? Any notes for follow-up..."></textarea>
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label>Existing Photos (Click X to remove)</label>
+                        <div id="edit-existing-photos" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:5px; margin-bottom:15px; min-height:20px;"></div>
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label>Add Additional Photo(s)</label>
+                        <input type="file" id="edit-photo" accept="image/*" multiple>
+                          <div id="edit-new-photo-previews" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" onclick="closeEditModal()">Cancel</button>
+                <button class="primary-btn" onclick="submitEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+    <div class="nav_secondary" style="margin: 0 20px 0 20px;">
+        <a class="nav_btn" href="/mobile">Mobile Scan</a>
+        <a class="nav_btn active" href="/maintenance">Maintenance</a>
+        <a class="nav_btn" href="/inventory">Inventory</a>
+        <a class="nav_btn" href="/tools">Tools</a>
+        <a class="nav_btn" href="/recuts">Recuts</a>
+    </div>
+    <script>
+        // In v2, "Shop" exists (/chat). In v1 it may not; default stays on "/".
+        (function () {
+            const a = document.getElementById('shop_link');
+            if (!a) return;
+            try {
+                fetch('/chat', { method: 'GET' }).then(r => {
+                    if (r && r.ok) a.setAttribute('href', '/chat');
+                }).catch(() => {});
+            } catch (e) {}
+        })();
+        // v1 local auth helper (works even when auth is disabled)
+        window.__innosawAuthRole = 'viewer';
+        async function innosawRefreshAuthBtn() {
+            const btn = document.getElementById('auth_btn');
+            if (!btn) return;
+            try {
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                window.__innosawAuthRole = (data && data.role) ? data.role : 'viewer';
+                const enabled = !!(data && data.enabled);
+                if (!enabled) {
+                    btn.style.display = 'none';
+                    return;
+                }
+                btn.style.display = 'inline-flex';
+                btn.textContent = (window.__innosawAuthRole && window.__innosawAuthRole !== 'viewer') ? 'Logout' : 'Login';
+            } catch (e) {
+                btn.style.display = 'none';
+            }
+        }
+        async function innosawAuthClick() {
+            try {
+                if (window.__innosawAuthRole && window.__innosawAuthRole !== 'viewer') {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/';
+                    return;
+                }
+            } catch (e) {}
+            window.location.href = '/login';
+        }
+        document.addEventListener('DOMContentLoaded', innosawRefreshAuthBtn);
+    </script>
+    
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Events</h3>
+                <div class="value" id="total-events">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Pending</h3>
+                <div class="value" id="pending-count">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>This Month</h3>
+                <div class="value" id="month-count">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg Duration</h3>
+                <div class="value" id="avg-duration" style="font-size: 20px;">-</div>
+            </div>
+        </div>
+        
+        <div class="actions-bar">
+                    <button class="primary-btn" onclick="openAddModal()">+ Add Maintenance Log</button>
+                    <div style="color:#556; font-size:13px;">Use your phone camera to attach a photo for damaged items or quick context.</div>
+        </div>
+
+        <div class="filters">
+            <select id="machine-filter">
+                <option value="">All Machines</option>
+            </select>
+            <select id="event-type-filter">
+                <option value="">All Event Types</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="repair">Repair</option>
+                <option value="inspection">Inspection</option>
+            </select>
+            <select id="status-filter">
+                <option value="">All Status</option>
+                <option value="resolved">Resolved</option>
+                <option value="pending">Pending</option>
+            </select>
+            <input type="number" id="limit-filter" placeholder="Limit" value="50" style="width: 100px;">
+            <button onclick="loadMaintenanceLogs()">Apply Filters</button>
+            <button onclick="resetFilters()" style="background: #6c757d;">Reset</button>
+        </div>
+        
+        <div class="maintenance-table">
+            <div id="loading" class="loading">Loading maintenance logs...</div>
+            <div id="error" class="error" style="display: none;"></div>
+            <table id="maintenance-table" style="display: none;">
+                <thead>
+                    <tr id="maintenanceHeaderRow">
+                        <th class="sortable-th" data-col="date" data-sort-key="timestamp"><span class="sortable-head">Date/Time <span class="sort-indicator" id="maintenance_sort_timestamp"></span></span></th>
+                        <th class="sortable-th" data-col="machine" data-sort-key="machine"><span class="sortable-head">Machine <span class="sort-indicator" id="maintenance_sort_machine"></span></span></th>
+                        <th class="sortable-th" data-col="event_type" data-sort-key="event_type"><span class="sortable-head">Event Type <span class="sort-indicator" id="maintenance_sort_event_type"></span></span></th>
+                        <th class="sortable-th" data-col="tool" data-sort-key="tool"><span class="sortable-head">Tool <span class="sort-indicator" id="maintenance_sort_tool"></span></span></th>
+                        <th class="sortable-th" data-col="operator" data-sort-key="operator_id"><span class="sortable-head">Operator <span class="sort-indicator" id="maintenance_sort_operator_id"></span></span></th>
+                        <th class="sortable-th" data-col="reason" data-sort-key="reason"><span class="sortable-head">Reason <span class="sort-indicator" id="maintenance_sort_reason"></span></span></th>
+                        <th class="sortable-th" data-col="photo" data-sort-key="photo"><span class="sortable-head">Photo <span class="sort-indicator" id="maintenance_sort_photo"></span></span></th>
+                        <th class="sortable-th" data-col="duration" data-sort-key="duration_minutes"><span class="sortable-head">Duration <span class="sort-indicator" id="maintenance_sort_duration_minutes"></span></span></th>
+                        <th class="sortable-th" data-col="parts_since_last" data-sort-key="parts_since_last"><span class="sortable-head">Parts Since Last <span class="sort-indicator" id="maintenance_sort_parts_since_last"></span></span></th>
+                        <th class="sortable-th" data-col="assigned" data-sort-key="assigned_to"><span class="sortable-head">Assigned <span class="sort-indicator" id="maintenance_sort_assigned_to"></span></span></th>
+                        <th class="sortable-th" data-col="status" data-sort-key="status"><span class="sortable-head">Status <span class="sort-indicator" id="maintenance_sort_status"></span></span></th>
+                        <th class="sortable-th" data-col="description" data-sort-key="description"><span class="sortable-head">Description <span class="sort-indicator" id="maintenance_sort_description"></span></span></th>
+                        <th data-col="actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="maintenance-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Maintenance Modal -->
+    <div id="add-modal" class="modal-backdrop" onclick="closeAddModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Add Maintenance Log</h2>
+                <button class="secondary-btn" onclick="closeAddModal()">Close</button>
+            </div>
+            <div class="modal-body">
+                <div id="add-error" class="error" style="display:none;"></div>
+                <div class="form-grid">
+            <div class="form-field">
+                <label>Machine</label>
+                <select id="add-machine" required>
+                    <option value="">Select...</option>
+                    <option value="CNC">CNC</option>
+                    <option value="Edge">Edge</option>
+                    <option value="Dowel">Dowel</option>
+                    <option value="Sort">Sort</option>
+                    <option value="Pull">Pull</option>
+                    <option value="Assembly">Assembly</option>
+                    <option value="QC">QC</option>
+                    <option value="Wrap">Wrap</option>
+                    <option value="Ship">Ship</option>
+                </select>
+            </div>
+                    <div class="form-field">
+                        <label>Event Type</label>
+                        <select id="add-event-type">
+                            <option value="tool_change">Tool Change</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="repair">Repair</option>
+                            <option value="inspection">Inspection</option>
+                            <option value="recut">Recut</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+            <div class="form-field">
+                <label>Tool Name / ID</label>
+                <input id="add-tool" list="tool-options-add" placeholder="e.g. 3750 - 3/8 Compression" />
+                <datalist id="tool-options-add"></datalist>
+                <select id="add-tool-select" style="margin-top:6px; width:100%;">
+                    <option value="">Active tools…</option>
+                </select>
+            </div>
+                    <div class="form-field">
+                        <label>Operator</label>
+                        <input id="add-operator" list="operator-options" placeholder="Type to search operators..." autocomplete="off" />
+                        <datalist id="operator-options"></datalist>
+                    </div>
+                    <div class="form-field">
+                        <label>Reason</label>
+                        <select id="add-reason">
+                            <option value="scheduled">Scheduled</option>
+                            <option value="unscheduled">Unscheduled</option>
+                            <option value="wear">Wear</option>
+                            <option value="damage">Damage</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Photo (optional)</label>
+                        <input id="add-photo" type="file" accept="image/*" multiple />
+                        <div id="add-photo-previews" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;"></div>
+                    </div>
+                    <div class="form-field">
+                        <label>Assigned To</label>
+                        <input id="add-assigned" list="user-options" placeholder="Type to search users/operators..." autocomplete="off" />
+                        <datalist id="user-options"></datalist>
+                    </div>
+                    <div class="form-field">
+                        <label>Duration Minutes (optional)</label>
+                        <input id="add-duration" type="number" step="0.1" placeholder="e.g. 12" />
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label>Description</label>
+                        <textarea id="add-description" placeholder="What happened? What was changed? Any notes for follow-up..."></textarea>
+                    </div>
+                </div>
+                <!-- Tool Change History Section -->
+                <div id="tool-change-history" style="display: none; margin-top: 20px; padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--card-shadow);">
+                    <h3 style="margin-bottom: 10px; color: var(--text-primary);">Tool Change History</h3>
+                    <div id="tool-history-content">
+                        <p style="color: var(--text-secondary); font-style: italic;">Select a tool to view change history...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" onclick="closeAddModal()">Cancel</button>
+                <button class="primary-btn" onclick="submitMaintenance()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let maintenanceData = [];
+        let toolOptionsCache = {}; // machine -> [{tool_code, tool_name}]
+        let operatorOptionsCache = null;
+        let userOptionsCache = null;
+        let maintenanceColOrder = ['date', 'machine', 'event_type', 'tool', 'operator', 'reason', 'photo', 'duration', 'parts_since_last', 'assigned', 'status', 'description', 'actions'];
+        let maintenanceColWidths = {};
+        let maintenanceSortField = '';
+        let maintenanceSortDirection = 'asc';
+
+        function saveMaintenanceTablePrefs() {
+            localStorage.setItem('maintenance_col_order', JSON.stringify(maintenanceColOrder));
+            localStorage.setItem('maintenance_col_widths', JSON.stringify(maintenanceColWidths));
+            localStorage.setItem('maintenance_sort', JSON.stringify({ field: maintenanceSortField, direction: maintenanceSortDirection }));
+        }
+
+        function loadMaintenanceTablePrefs() {
+            try {
+                const savedOrder = localStorage.getItem('maintenance_col_order');
+                if (savedOrder) {
+                    const parsed = JSON.parse(savedOrder);
+                    const required = ['date', 'machine', 'event_type', 'tool', 'operator', 'reason', 'photo', 'duration', 'parts_since_last', 'assigned', 'status', 'description', 'actions'];
+                    const existing = parsed.filter(col => required.includes(col));
+                    const missing = required.filter(col => !existing.includes(col));
+                    maintenanceColOrder = existing.concat(missing);
+                }
+                const savedWidths = localStorage.getItem('maintenance_col_widths');
+                if (savedWidths) {
+                    maintenanceColWidths = JSON.parse(savedWidths) || {};
+                }
+                const savedSort = localStorage.getItem('maintenance_sort');
+                if (savedSort) {
+                    const parsedSort = JSON.parse(savedSort);
+                    maintenanceSortField = parsedSort?.field || '';
+                    maintenanceSortDirection = parsedSort?.direction === 'desc' ? 'desc' : 'asc';
+                }
+            } catch (e) {}
+        }
+
+        function updateMaintenanceSortIndicators() {
+            document.querySelectorAll('#maintenanceHeaderRow .sort-indicator').forEach(el => {
+                const field = (el.id || '').replace('maintenance_sort_', '');
+                el.textContent = field === maintenanceSortField ? (maintenanceSortDirection === 'asc' ? '▲' : '▼') : '';
+            });
+        }
+
+        function toggleMaintenanceSort(field) {
+            if (!field) return;
+            if (maintenanceSortField === field) {
+                maintenanceSortDirection = maintenanceSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                maintenanceSortField = field;
+                maintenanceSortDirection = 'asc';
+            }
+            saveMaintenanceTablePrefs();
+            updateMaintenanceSortIndicators();
+            updateTable();
+        }
+
+        function compareMaintenanceValues(a, b, type = 'text') {
+            if (type === 'number') {
+                return (Number(a) || 0) - (Number(b) || 0);
+            }
+            if (type === 'date') {
+                return (a ? new Date(a).getTime() : 0) - (b ? new Date(b).getTime() : 0);
+            }
+            return String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        function maintenanceEscapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getMaintenanceSortValue(log, field) {
+            switch (field) {
+                case 'timestamp':
+                    return log.timestamp || '';
+                case 'duration_minutes':
+                    return Number(log.duration_minutes || 0);
+                case 'parts_since_last':
+                    return Number(log.parts_since_last || 0);
+                case 'photo':
+                    return log.photo_url || log.photo_path ? 1 : 0;
+                case 'status':
+                    return log.resolved ? 'Resolved' : 'Pending';
+                case 'description':
+                    return (log.description || log.notes || '').toString();
+                case 'assigned_to':
+                    return (log.assigned_to || '').toString();
+                case 'operator_id':
+                    return (log.operator_id || '').toString();
+                case 'event_type':
+                    return (log.event_type || '').toString();
+                case 'machine':
+                case 'tool':
+                case 'reason':
+                default:
+                    return (log[field] || '').toString();
+            }
+        }
+
+        function initMaintenanceTableInteractions() {
+            const table = document.getElementById('maintenance-table');
+            const headers = table ? table.querySelectorAll('#maintenanceHeaderRow th') : [];
+            headers.forEach(th => {
+                const colKey = th.getAttribute('data-col');
+                if (!colKey) return;
+
+                if (!th.querySelector('.drag-handle')) {
+                    const handle = document.createElement('span');
+                    handle.className = 'drag-handle';
+                    handle.innerHTML = '⋮⋮';
+                    th.prepend(handle);
+                    handle.draggable = true;
+                    handle.addEventListener('dragstart', e => {
+                        e.dataTransfer.setData('text/plain', colKey);
+                        e.dataTransfer.effectAllowed = 'move';
+                        th.classList.add('dragging');
+                        e.stopPropagation();
+                    });
+                    handle.addEventListener('dragend', () => {
+                        th.classList.remove('dragging');
+                    });
+                }
+
+                if (!th.querySelector('.resizer')) {
+                    const resizer = document.createElement('div');
+                    resizer.className = 'resizer';
+                    th.appendChild(resizer);
+                    let startX, startWidth;
+                    resizer.addEventListener('mousedown', e => {
+                        startX = e.pageX;
+                        startWidth = th.offsetWidth;
+                        const onMouseMove = ev => {
+                            const width = startWidth + (ev.pageX - startX);
+                            th.style.width = width + 'px';
+                            maintenanceColWidths[colKey] = width + 'px';
+                        };
+                        const onMouseUp = () => {
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                            saveMaintenanceTablePrefs();
+                        };
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                        e.stopPropagation();
+                    });
+                    resizer.addEventListener('mousedown', e => e.stopPropagation());
+                }
+
+                if (maintenanceColWidths[colKey]) th.style.width = maintenanceColWidths[colKey];
+
+                th.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                th.addEventListener('drop', e => {
+                    e.preventDefault();
+                    const draggedCol = e.dataTransfer.getData('text/plain');
+                    const targetCol = colKey;
+                    if (!draggedCol || draggedCol === targetCol) return;
+                    const fromIdx = maintenanceColOrder.indexOf(draggedCol);
+                    const toIdx = maintenanceColOrder.indexOf(targetCol);
+                    if (fromIdx === -1 || toIdx === -1) return;
+                    maintenanceColOrder.splice(fromIdx, 1);
+                    maintenanceColOrder.splice(toIdx, 0, draggedCol);
+                    saveMaintenanceTablePrefs();
+                    applyMaintenanceTableOrder();
+                });
+
+                const sortKey = th.getAttribute('data-sort-key');
+                if (sortKey) {
+                    th.addEventListener('click', e => {
+                        if (e.target.closest('.drag-handle') || e.target.closest('.resizer')) return;
+                        toggleMaintenanceSort(sortKey);
+                    });
+                }
+            });
+            updateMaintenanceSortIndicators();
+        }
+
+        function applyMaintenanceTableOrder() {
+            const tr = document.getElementById('maintenanceHeaderRow');
+            if (!tr) return;
+            const ths = Array.from(tr.querySelectorAll('th'));
+            maintenanceColOrder.forEach(key => {
+                const th = ths.find(t => t.getAttribute('data-col') === key);
+                if (th) tr.appendChild(th);
+            });
+            updateMaintenanceSortIndicators();
+            if (maintenanceData.length) updateTable();
+        }
+
+        function fixExternalLinks() {
+            const host = window.location.hostname || 'localhost';
+            const proto = (window.location.protocol === 'https:') ? 'https' : 'http';
+            const portStr = window.location.port || '';
+
+            const hostParts = host.split('.');
+            const sub = hostParts[0];
+            const baseDomain = (hostParts.length >= 3 && (sub === 'qr' || sub === 'bins'))
+                ? hostParts.slice(1).join('.')
+                : null;
+            const onPublicHttps = !!baseDomain && proto === 'https';
+            const behindProxyNoPorts = !portStr || portStr === '80' || portStr === '443';
+
+            document.querySelectorAll('.ext-link').forEach(a => {
+                const port = a.getAttribute('data-port');
+                const path = a.getAttribute('data-path') || '/';
+                if (port === '5007' && (onPublicHttps || behindProxyNoPorts)) {
+                    a.style.display = 'none';
+                    return;
+                }
+
+                if (port === '5000') {
+                    if (onPublicHttps) {
+                        a.href = `https://bins.${baseDomain}${path}`;
+                        return;
+                    }
+                    if (behindProxyNoPorts) {
+                        const p = path.startsWith('/') ? path : `/${path}`;
+                        a.href = `${proto}://${host}/bins${p}`;
+                        return;
+                    }
+                }
+
+                if (port) a.href = `${proto}://${host}:${port}${path}`;
+            });
+        }
+        
+        function loadMaintenanceLogs() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const table = document.getElementById('maintenance-table');
+            const tbody = document.getElementById('maintenance-tbody');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            table.style.display = 'none';
+            
+            const machine = document.getElementById('machine-filter').value;
+            const limit = document.getElementById('limit-filter').value || 50;
+            
+            const params = new URLSearchParams({ limit });
+            if (machine) params.append('machine', machine);
+            
+            fetch(`/api/maintenance/logs?${params}`)
+                .then(r => r.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    
+                    if (data.error) {
+                        error.textContent = `Error: ${data.error}`;
+                        error.style.display = 'block';
+                        return;
+                    }
+                    
+                    maintenanceData = data.maintenance_logs || [];
+                    updateTable();
+                    updateStats();
+                    loadMachines(); // Populate machine filter dropdown
+                    table.style.display = 'table';
+                })
+                .catch(e => {
+                    loading.style.display = 'none';
+                    error.textContent = `Error loading data: ${e.message}`;
+                    error.style.display = 'block';
+                });
+        }
+        
+        function updateTable() {
+            const tbody = document.getElementById('maintenance-tbody');
+            const machineFilter = document.getElementById('machine-filter').value;
+            const eventTypeFilter = document.getElementById('event-type-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+            
+            let filtered = maintenanceData;
+            
+            if (machineFilter) {
+                filtered = filtered.filter(log => log.machine === machineFilter);
+            }
+            
+            if (eventTypeFilter) {
+                filtered = filtered.filter(log => log.event_type === eventTypeFilter);
+            }
+            
+            if (statusFilter) {
+                const resolved = statusFilter === 'resolved';
+                filtered = filtered.filter(log => (log.resolved === 1) === resolved);
+            }
+
+            if (maintenanceSortField) {
+                const direction = maintenanceSortDirection === 'desc' ? -1 : 1;
+                const sortType = ['duration_minutes', 'parts_since_last', 'photo'].includes(maintenanceSortField)
+                    ? 'number'
+                    : (maintenanceSortField === 'timestamp' ? 'date' : 'text');
+                filtered = filtered.slice().sort((a, b) => {
+                    const primary = compareMaintenanceValues(
+                        getMaintenanceSortValue(a, maintenanceSortField),
+                        getMaintenanceSortValue(b, maintenanceSortField),
+                        sortType
+                    );
+                    if (primary !== 0) return primary * direction;
+                    return compareMaintenanceValues(a.timestamp || '', b.timestamp || '', 'date') * -1;
+                });
+            }
+
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="${maintenanceColOrder.length}" class="loading">No maintenance logs found</td></tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = filtered.map(log => {
+                const date = new Date(log.timestamp);
+                const duration = log.duration_minutes 
+                    ? `${Math.round(log.duration_minutes)} min` 
+                    : '-';
+
+                let rawPhotoUrl = log.photo_url ? log.photo_url : (log.photo_path ? `/api/${log.photo_path}` : null);
+                let photoUrl = '';
+                if (rawPhotoUrl) {
+                    const rawList = rawPhotoUrl.split(',').map(u => u.trim()).filter(Boolean);
+                    const cleanList = rawList.map(u => {
+                        let c = u;
+                        while (c.includes('/uploads/maintenance/uploads/maintenance/')) {
+                            c = c.replace(/\/uploads\/maintenance\/uploads\/maintenance\//g, '/uploads/maintenance/');
+                        }
+                        if (!c.startsWith('/') && !c.startsWith('http')) {
+                            c = `/uploads/maintenance/${c}`;
+                        }
+                        return c;
+                    });
+                    photoUrl = cleanList.join(',');
+                }
+                let photoCell = '-';
+                if (photoUrl) {
+                    const urlList = photoUrl.split(',').map(u => u.trim()).filter(Boolean);
+                    if (urlList.length > 0) {
+                        const links = urlList.map(u => `<a href="${u}" target="_blank" rel="noopener"><img class="thumb" src="${u}" alt="photo" style="margin-right:5px; margin-bottom:5px;"></a>`);
+                        photoCell = `<div style="display:flex; flex-wrap:wrap;">${links.join('')}</div>`;
+                    }
+                }
+
+                const desc = (log.description || log.notes || '').toString();
+                const assigned = (log.assigned_to || '').toString();
+                const cells = maintenanceColOrder.map(key => {
+                    if (key === 'date') return `<td>${date.toLocaleString()}</td>`;
+                    if (key === 'machine') return `<td><strong>${maintenanceEscapeHtml(log.machine || '-')}</strong></td>`;
+                    if (key === 'event_type') return `<td><span class="badge badge-${maintenanceEscapeHtml(log.event_type || '')}">${maintenanceEscapeHtml(log.event_type || '-')}</span></td>`;
+                    if (key === 'tool') return `<td>${maintenanceEscapeHtml(log.tool || '-')}</td>`;
+                    if (key === 'operator') return `<td>${maintenanceEscapeHtml(log.operator_id || '-')}</td>`;
+                    if (key === 'reason') return `<td>${maintenanceEscapeHtml(log.reason || '-')}</td>`;
+                    if (key === 'photo') return `<td>${photoCell}</td>`;
+                    if (key === 'duration') return `<td>${duration}</td>`;
+                    if (key === 'parts_since_last') return `<td>${maintenanceEscapeHtml(log.parts_since_last || '-')}</td>`;
+                    if (key === 'assigned') return `<td>${assigned ? maintenanceEscapeHtml(assigned) : '-'}</td>`;
+                    if (key === 'status') {
+                        return `<td>
+                            <span class="badge ${log.resolved ? 'badge-resolved' : 'badge-pending'}">${log.resolved ? 'Resolved' : 'Pending'}</span>
+                            ${log.resolved && log.resolved_by ? `<br><small style="color:var(--text-secondary); font-size:11px;">by ${maintenanceEscapeHtml(log.resolved_by || '')}</small>` : ''}
+                            ${log.resolved && log.resolved_at ? `<br><small style="color:var(--text-secondary); font-size:11px;">${new Date(log.resolved_at).toLocaleString()}</small>` : ''}
+                        </td>`;
+                    }
+                    if (key === 'description') {
+                        return `<td>
+                            <span class="editable-description" data-id="${log.id}" style="cursor: pointer; text-decoration: underline; color: var(--link-color);" title="Click to edit">${desc ? maintenanceEscapeHtml(desc) : '<em style="color:var(--text-muted);">Click to add notes...</em>'}</span>
+                        </td>`;
+                    }
+                    if (key === 'actions') {
+                        return `<td>
+                            <button class="secondary-btn" style="padding:6px 10px; font-size:12px;" onclick="openEditModal(${log.id})">Edit</button>
+                            <button class="secondary-btn" style="padding:6px 10px; font-size:12px;" onclick="toggleResolved(${log.id}, ${log.resolved ? 'false' : 'true'})">${log.resolved ? 'Reopen' : 'Resolve'}</button>
+                            <button class="secondary-btn" style="padding:6px 10px; font-size:12px; background:#b02a37;" onclick="deleteMaintenance(${log.id})">Delete</button>
+                        </td>`;
+                    }
+                    return '<td></td>';
+                });
+
+                return `<tr>${cells.join('')}</tr>`;
+            }).join('');
+            
+            // Make descriptions editable after rendering
+            setTimeout(makeDescriptionEditable, 100);
+        }
+        
+        function updateStats() {
+            const total = maintenanceData.length;
+            const pending = maintenanceData.filter(log => !log.resolved).length;
+            const thisMonth = maintenanceData.filter(log => {
+                const date = new Date(log.timestamp);
+                const now = new Date();
+                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            }).length;
+            
+            const durations = maintenanceData
+                .filter(log => log.duration_minutes)
+                .map(log => log.duration_minutes);
+            const avgDuration = durations.length > 0
+                ? `${Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)} min`
+                : '-';
+            
+            document.getElementById('total-events').textContent = total;
+            document.getElementById('pending-count').textContent = pending;
+            document.getElementById('month-count').textContent = thisMonth;
+            document.getElementById('avg-duration').textContent = avgDuration;
+        }
+        
+        function resetFilters() {
+            document.getElementById('machine-filter').value = '';
+            document.getElementById('event-type-filter').value = '';
+            document.getElementById('status-filter').value = '';
+            document.getElementById('limit-filter').value = '50';
+            loadMaintenanceLogs();
+        }
+        
+        function loadMachines() {
+            // Extract unique machines from data
+            const machines = [...new Set(maintenanceData.map(log => log.machine).filter(Boolean))];
+            const select = document.getElementById('machine-filter');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">All Machines</option>';
+            machines.forEach(machine => {
+                const option = document.createElement('option');
+                option.value = machine;
+                option.textContent = machine;
+                select.appendChild(option);
+            });
+            if (machines.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        async function openAddModal() {
+            document.getElementById('add-error').style.display = 'none';
+            document.getElementById('add-error').textContent = '';
+            document.getElementById('add-modal').style.display = 'flex';
+            await loadOperatorOptions();
+            await loadUserOptions();
+            const mach = document.getElementById('add-machine')?.value || '';
+            await loadToolOptions(mach, 'tool-options-add', 'add-tool-select');
+        }
+
+        function closeAddModal(evt) {
+            if (evt && evt.target && evt.target.classList && !evt.target.classList.contains('modal-backdrop')) return;
+            document.getElementById('add-modal').style.display = 'none';
+        }
+
+        async function submitMaintenance() {
+            const err = document.getElementById('add-error');
+            err.style.display = 'none';
+            err.textContent = '';
+
+            const machine = document.getElementById('add-machine').value;
+            const event_type = document.getElementById('add-event-type').value;
+            const tool = document.getElementById('add-tool').value;
+            const operator_id = document.getElementById('add-operator').value;
+            const reason = document.getElementById('add-reason').value;
+            const description = document.getElementById('add-description').value;
+            
+            const assigned_to = document.getElementById('add-assigned').value;
+            const duration_minutes = document.getElementById('add-duration').value;
+
+            if (!machine) {
+                err.textContent = 'Machine is required.';
+                err.style.display = 'block';
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('machine', machine);
+            fd.append('event_type', event_type);
+            if (tool) fd.append('tool', tool);
+            if (operator_id) fd.append('operator_id', operator_id);
+            if (reason) fd.append('reason', reason);
+            if (description) fd.append('description', description);
+            if (assigned_to) fd.append('assigned_to', assigned_to);
+            if (duration_minutes) fd.append('duration_minutes', duration_minutes);
+            if (selectedPhotos && selectedPhotos.length > 0) {
+                for (let i = 0; i < selectedPhotos.length; i++) {
+                    fd.append('photo', selectedPhotos[i]);
+                }
+            }
+
+            try {
+                const res = await fetch('/api/maintenance', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                closeAddModal();
+                // clear fields
+                document.getElementById('add-tool').value = '';
+                document.getElementById('add-operator').value = '';
+                document.getElementById('add-description').value = '';
+                document.getElementById('add-photo').value = '';
+                  selectedPhotos = [];
+                  renderAddPreviews();
+                document.getElementById('add-assigned').value = '';
+                document.getElementById('add-duration').value = '';
+                await loadMaintenanceLogs();
+            } catch (e) {
+                err.textContent = `Error: ${e.message}`;
+                err.style.display = 'block';
+            }
+        }
+
+        async function deleteMaintenance(id) {
+            if (!confirm('Delete this maintenance entry?')) return;
+            try {
+                const res = await fetch(`/api/maintenance/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                await loadMaintenanceLogs();
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+
+        async function toggleResolved(id, resolved) {
+            if (resolved) {
+                // Show prompt to capture who resolved it
+                const resolvedBy = prompt('Who is resolving this? (Enter your name or operator code):');
+                if (!resolvedBy || !resolvedBy.trim()) {
+                    return; // User cancelled or didn't enter name
+                }
+                
+                try {
+                    const res = await fetch(`/api/maintenance/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            resolved: true,
+                            resolved_by: resolvedBy.trim()
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                    await loadMaintenanceLogs();
+                } catch (e) {
+                    alert(`Error: ${e.message}`);
+                }
+            } else {
+                // Reopening - just set resolved to false
+                try {
+                    const res = await fetch(`/api/maintenance/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ resolved: false })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                    await loadMaintenanceLogs();
+                } catch (e) {
+                    alert(`Error: ${e.message}`);
+                }
+            }
+        }
+
+        async function loadOperatorOptions() {
+            if (operatorOptionsCache) {
+                // Auto-fill operator fields with logged-in user's operator_code
+                await autoFillOperatorFields();
+                return;
+            }
+            try {
+                const res = await fetch('/api/admin/operators');
+                const data = await res.json();
+                const operators = (data.operators || [])
+                    .filter(op => op.active !== false)
+                    .map(op => ({
+                        code: (op.operator_code || '').trim(),
+                        name: (op.operator_name || op.name || '').trim(),
+                        display: `${(op.operator_code || '').trim()}${op.operator_name ? ' - ' + op.operator_name : ''}`
+                    }))
+                    .filter(op => op.code);
+                operatorOptionsCache = operators;
+                const dl = document.getElementById('operator-options');
+                if (dl) {
+                    dl.innerHTML = operators.map(op => `<option value="${op.code}">${op.display}</option>`).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load operators:', e);
+                operatorOptionsCache = [];
+            }
+            // Auto-fill operator fields with logged-in user's operator_code
+            await autoFillOperatorFields();
+        }
+        
+        async function autoFillOperatorFields() {
+            try {
+                const whoamiRes = await fetch('/api/whoami');
+                const whoamiData = await whoamiRes.json();
+                if (whoamiData.operator_code) {
+                    // Auto-fill add operator field if empty
+                    const addOp = document.getElementById('add-operator');
+                    if (addOp && !addOp.value.trim()) {
+                        addOp.value = whoamiData.operator_code;
+                    }
+                    // Auto-fill edit operator field if empty (when editing)
+                    const editOp = document.getElementById('edit-operator');
+                    if (editOp && !editOp.value.trim()) {
+                        editOp.value = whoamiData.operator_code;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to auto-fill operator from logged-in user", e);
+            }
+        }
+
+        async function loadUserOptions() {
+            if (userOptionsCache) return;
+            try {
+                const res = await fetch('/api/admin/shop_users');
+                const data = await res.json();
+                const users = (data.users || [])
+                    .map(u => ({
+                        name: (u.name || u.display_name || u.email || '').trim(),
+                        email: (u.email || '').trim(),
+                        operator_code: (u.operator_code || '').trim(),
+                        display: `${(u.name || u.display_name || u.email || '').trim()}${u.operator_code ? ' (' + u.operator_code + ')' : ''}`
+                    }))
+                    .filter(u => u.name || u.email);
+                // Also include operators
+                try {
+                    const opRes = await fetch('/api/admin/operators');
+                    const opData = await opRes.json();
+                    (opData.operators || []).forEach(op => {
+                        if (op.active !== false && op.operator_code) {
+                            const exists = users.some(u => u.operator_code === op.operator_code);
+                            if (!exists) {
+                                users.push({
+                                    name: (op.operator_name || op.name || op.operator_code || '').trim(),
+                                    email: '',
+                                    operator_code: (op.operator_code || '').trim(),
+                                    display: `${(op.operator_code || '').trim()}${op.operator_name ? ' - ' + op.operator_name : ''}`
+                                });
+                            }
+                        }
+                    });
+                } catch (e) {}
+                userOptionsCache = users;
+                const dl = document.getElementById('user-options');
+                if (dl) {
+                    dl.innerHTML = users.map(u => `<option value="${u.display}">${u.display}</option>`).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load users:', e);
+                userOptionsCache = [];
+            }
+        }
+
+        async function loadToolOptions(machine, datalistId, selectId = null) {
+            const dl = document.getElementById(datalistId);
+            if (!dl) return;
+            dl.innerHTML = '';
+            const sel = selectId ? document.getElementById(selectId) : null;
+            if (sel) {
+                sel.innerHTML = '<option value="">Active tools…</option>';
+            }
+            if (!machine) return;
+            
+            // Clean machine name for comparison (strip suffix like -1)
+            const baseMachine = machine.split('-')[0].trim().toUpperCase();
+            if (!toolOptionsCache[machine]) {
+                try {
+                    const res = await fetch(`/api/tools/inventory?machine=${encodeURIComponent(machine)}`);
+                    const data = await res.json();
+                    const tools = (data.tools || [])
+                        .map(t => ({
+                            tool_id: t.id ?? t.tool_id ?? null,
+                            tool_code: (t.tool_code || '').trim(),
+                            tool_name: (t.tool_name || '').trim()
+                        }))
+                        .filter(t => t.tool_code || t.tool_name);
+                    toolOptionsCache[machine] = tools;
+                } catch (e) {
+                    toolOptionsCache[machine] = [];
+                }
+            }
+            toolOptionsCache[machine].forEach(t => {
+                const val = t.tool_code ? `${t.tool_code} - ${t.tool_name || ''}`.trim() : (t.tool_name || '');
+                const opt = document.createElement('option');
+                opt.value = val;
+                dl.appendChild(opt);
+                if (sel) {
+                    const o2 = document.createElement('option');
+                    o2.value = val;
+                    o2.textContent = val;
+                    sel.appendChild(o2);
+                }
+            });
+        }
+
+        async function loadToolChangeHistory() {
+            const toolInput = document.getElementById('add-tool').value.trim();
+            const machine = document.getElementById('add-machine').value;
+            const contentDiv = document.getElementById('tool-history-content');
+            
+            if (!toolInput) {
+                contentDiv.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Select a tool to view change history...</p>';
+                return;
+            }
+            
+            contentDiv.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">Loading...</p>';
+            
+            try {
+                // Parse tool_code and tool_name from input (e.g. "3750 - 3/8 Compression")
+                const parts = toolInput.split(' - ');
+                const toolCode = parts[0].trim();
+                const toolName = parts.slice(1).join(' - ').trim();
+
+                // Resolve tool_id from cached inventory (tool_changes stores old_tool_id/new_tool_id as tool IDs)
+                const candidates = (toolOptionsCache[machine] || []);
+                const match = candidates.find(t => (t.tool_code || '').trim() === toolCode)
+                    || candidates.find(t => (t.tool_name || '').trim().toLowerCase() === toolName.toLowerCase());
+                const toolId = match?.tool_id ?? null;
+                
+                // Fetch tool changes for this tool
+                const res = await fetch(`/api/tools/changes?limit=200&machine=${encodeURIComponent(machine)}`);
+                const data = await res.json();
+                
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                
+                const changes = (data.tool_changes || []).filter(change => {
+                    if (toolId != null && change.old_tool_id != null) {
+                        return String(change.old_tool_id) === String(toolId);
+                    }
+                    const tn = (change.tool_name || '').toLowerCase();
+                    return (toolName && tn.includes(toolName.toLowerCase())) || (toolCode && tn.includes(toolCode.toLowerCase()));
+                });
+                
+                if (changes.length === 0) {
+                    contentDiv.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">No previous changes found for this tool.</p>';
+                    return;
+                }
+                
+                let html = '<div style="max-height: 200px; overflow-y: auto;">';
+                html += `<div style="margin-bottom: 8px; color:var(--text-secondary); font-size:12px;">Showing ${changes.length} changes</div>`;
+                html += '<table style="width: 100%; border-collapse: collapse; font-size: 12px;">';
+                html += '<thead><tr style="background: var(--table-header-bg); color: var(--table-header-text);"><th>Date</th><th>Parts</th><th>Sheets</th><th>Reason</th></tr></thead><tbody>';
+                
+                changes.forEach(change => {
+                    const date = new Date(change.timestamp).toLocaleDateString();
+                    const parts = change.parts_on_old_tool || 0;
+                    const sheets = change.sheets_on_old_tool || 0;
+                    const reason = change.reason || 'N/A';
+                    
+                    html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                        <td>${date}</td>
+                        <td>${parts}</td>
+                        <td>${sheets}</td>
+                        <td>${reason}</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                contentDiv.innerHTML = html;
+            } catch (e) {
+                contentDiv.innerHTML = `<p style="color: #dc3545;">Error loading history: ${e.message}</p>`;
+            }
+        }
+
+        document.getElementById('add-machine')?.addEventListener('change', (e) => {
+            loadToolOptions(e.target.value, 'tool-options-add', 'add-tool-select');
+        });
+        document.getElementById('add-tool-select')?.addEventListener('change', (e) => {
+            const val = e.target.value || '';
+            const inp = document.getElementById('add-tool');
+            if (inp) inp.value = val;
+        });
+        document.getElementById('edit-machine')?.addEventListener('change', (e) => {
+            loadToolOptions(e.target.value, 'tool-options-edit', 'edit-tool-select');
+        });
+        document.getElementById('edit-tool-select')?.addEventListener('change', (e) => {
+            const val = e.target.value || '';
+            const inp = document.getElementById('edit-tool');
+            if (inp) inp.value = val;
+        });
+
+        // Show/hide tool change history based on event type
+        document.getElementById('add-event-type')?.addEventListener('change', (e) => {
+            const historyDiv = document.getElementById('tool-change-history');
+            if (e.target.value === 'tool_change') {
+                historyDiv.style.display = 'block';
+                loadToolChangeHistory();
+            } else {
+                historyDiv.style.display = 'none';
+            }
+        });
+
+        // Load tool change history when tool is selected
+        document.getElementById('add-tool')?.addEventListener('input', (e) => {
+            if (document.getElementById('add-event-type').value === 'tool_change') {
+                loadToolChangeHistory();
+            }
+        });
+        
+        // Event listeners for filters
+        document.getElementById('machine-filter').addEventListener('change', updateTable);
+        document.getElementById('event-type-filter').addEventListener('change', updateTable);
+        document.getElementById('status-filter').addEventListener('change', updateTable);
+        
+        // Click-to-edit description
+        function makeDescriptionEditable() {
+            document.querySelectorAll('.editable-description').forEach(span => {
+                span.addEventListener('click', function() {
+                    const id = parseInt(this.getAttribute('data-id'));
+                    const log = maintenanceData.find(l => l.id === id);
+                    const currentDesc = log?.description || '';
+                    const newDesc = prompt('Edit description/notes:', currentDesc);
+                    if (newDesc !== null) { // User didn't cancel
+                        updateMaintenanceDescription(id, newDesc);
+                    }
+                });
+            });
+        }
+
+        async function openEditModal(id) {
+            const log = maintenanceData.find(l => l.id === id);
+            if (!log) return;
+            const modal = document.getElementById('edit-modal');
+            modal.style.display = 'flex';
+            await loadOperatorOptions();
+            await loadUserOptions();
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+            setVal('edit-machine', log.machine || '');
+            loadToolOptions(log.machine || '', 'tool-options-edit', 'edit-tool-select');
+            setVal('edit-event-type', log.event_type || log.maintenance_type || 'maintenance');
+            setVal('edit-tool', log.tool || '');
+            setVal('edit-operator', log.operator_id || log.performed_by || '');
+            // Auto-fill operator if empty
+            const editOp = document.getElementById('edit-operator');
+            if (editOp && !editOp.value.trim()) {
+                await autoFillOperatorFields();
+            }
+            setVal('edit-reason', log.reason || log.severity || 'scheduled');
+            setVal('edit-assigned', log.assigned_to || '');
+            setVal('edit-duration', log.duration_minutes || '');
+            setVal('edit-status', log.resolved ? 'resolved' : 'pending');
+            setVal('edit-description', log.description || log.notes || '');
+              modal.setAttribute('data-id', id);
+
+              const existingContainer = document.getElementById('edit-existing-photos');
+              if (existingContainer) {
+                  existingContainer.innerHTML = '';
+                  let photoUrl = log.photo_url ? log.photo_url : (log.photo_path ? `/api/${log.photo_path}` : null);
+                    if (photoUrl) {
+                        const rawUrls = photoUrl.split(',').map(u => u.trim()).filter(Boolean);
+                        const cleanUrls = rawUrls.map(u => {
+                            let c = u;
+                            while(c.includes('/uploads/maintenance/uploads/maintenance/')) {
+                                c = c.replace(/\/uploads\/maintenance\/uploads\/maintenance\//g, '/uploads/maintenance/');
+                            }
+                            if (!c.startsWith('/uploads/maintenance/') && !c.startsWith('/') && !c.startsWith('http')) {
+                                c = '/uploads/maintenance/' + c;
+                            }
+                            return c;
+                        });
+                        cleanUrls.forEach((url, i) => {
+                          const div = document.createElement('div');
+                          div.style.position = 'relative';
+                          div.style.display = 'inline-block';
+                          div.innerHTML = `
+                              <img src="${url}" style="width:100px; height:100px; object-fit:cover; border-radius:4px; border:1px solid #ccc;">
+                              <button type="button" onclick="this.parentElement.remove()" data-url="${url}" class="delete-photo-btn" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-weight:bold; line-height:1; padding:0;">&times;</button>
+                          `;
+                          existingContainer.appendChild(div);
+                      });
+                  }
+              }
+          }
+
+        function closeEditModal(ev) {
+            if (ev && ev.target && ev.target.id !== 'edit-modal' && ev.target.closest && ev.target.closest('.modal')) return;
+            // Don't close if there's active text selection
+            const selection = window.getSelection();
+            if (selection && selection.toString().length > 0) return;
+            const modal = document.getElementById('edit-modal');
+            modal.style.display = 'none';
+            editSelectedPhotos = [];
+            renderEditPreviews();
+        }
+
+        async function submitEdit() {
+              const modal = document.getElementById('edit-modal');
+              const id = parseInt(modal.getAttribute('data-id'));
+              if (!id) return;
+
+              const fd = new FormData();
+              fd.append('machine', document.getElementById('edit-machine')?.value || '');
+              fd.append('event_type', document.getElementById('edit-event-type')?.value || '');
+              fd.append('tool', document.getElementById('edit-tool')?.value || '');
+              fd.append('operator_id', document.getElementById('edit-operator')?.value || '');
+              
+              const reasonVal = document.getElementById('edit-reason')?.value || '';
+              fd.append('reason', reasonVal);
+              fd.append('severity', reasonVal);
+
+              fd.append('assigned_to', document.getElementById('edit-assigned')?.value || '');
+              fd.append('duration_minutes', document.getElementById('edit-duration')?.value || '');
+              fd.append('notes', document.getElementById('edit-description')?.value || '');
+              fd.append('description', document.getElementById('edit-description')?.value || '');
+              
+              if (document.getElementById('edit-status')?.value === 'resolved') {
+                  fd.append('resolved', 'true');
+              }
+
+              // Gather kept existing photos
+              const existingBtns = document.querySelectorAll('#edit-existing-photos .delete-photo-btn');
+              existingBtns.forEach(btn => {
+                  fd.append('existing_photos', btn.getAttribute('data-url'));
+              });
+
+              // Gather new photos
+                if (editSelectedPhotos && editSelectedPhotos.length > 0) {
+                    editSelectedPhotos.forEach(file => {
+                        fd.append('photo', file);
+                    });
+
+              }
+
+                try {
+                  const res = await fetch(`/api/maintenance/${id}`, {
+                      method: 'PUT',
+                      body: fd
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                  
+                  closeEditModal();
+                  await loadMaintenanceLogs();
+              } catch (e) {
+                  const err = document.getElementById('edit-error');
+                  if (err) { err.textContent = e.message || String(e); err.style.display = 'block'; }
+              }
+          }
+        
+        async function updateMaintenanceDescription(id, description) {
+            try {
+                const res = await fetch(`/api/maintenance/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description: description.trim() })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+                await loadMaintenanceLogs();
+            } catch (e) {
+                alert(`Error updating description: ${e.message}`);
+            }
+        }
+        
+        loadMaintenanceTablePrefs();
+        initMaintenanceTableInteractions();
+        applyMaintenanceTableOrder();
+
+        // Initial load
+        fixExternalLinks();
+        loadMaintenanceLogs();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadMaintenanceLogs, 30000);
+
+        // --- Incremental Photo Selection Logic ---
+        let selectedPhotos = [];
+        let editSelectedPhotos = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const addPhotoInput = document.getElementById('add-photo');
+            if (addPhotoInput) {
+                addPhotoInput.addEventListener('change', (e) => {
+                    Array.from(e.target.files).forEach(file => selectedPhotos.push(file));
+                    renderAddPreviews();
+                    addPhotoInput.value = ''; // Reset to allow same folder selection
+                });
+            }
+
+            const editPhotoInput = document.getElementById('edit-photo');
+            if (editPhotoInput) {
+                editPhotoInput.addEventListener('change', (e) => {
+                    Array.from(e.target.files).forEach(file => editSelectedPhotos.push(file));
+                    renderEditPreviews();
+                    editPhotoInput.value = '';
+                });
+            }
+        });
+
+        function renderAddPreviews() {
+            const container = document.getElementById('add-photo-previews');
+            if (!container) return;
+            container.innerHTML = '';
+            selectedPhotos.forEach((file, index) => {
+                const url = URL.createObjectURL(file);
+                const div = document.createElement('div');
+                div.style.cssText = 'position:relative; display:inline-block; margin-top:5px;';
+                div.innerHTML = `
+                    <img src="${url}" style="width:100px; height:100px; object-fit:cover; border-radius:4px; border:1px solid #ccc;">
+                    <button type="button" onclick="removeAddPhoto(${index})" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-weight:bold; line-height:1; padding:0;">&times;</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function removeAddPhoto(index) {
+            selectedPhotos.splice(index, 1);
+            renderAddPreviews();
+        }
+
+        function renderEditPreviews() {
+            const container = document.getElementById('edit-new-photo-previews');
+            if (!container) return;
+            container.innerHTML = '';
+            editSelectedPhotos.forEach((file, index) => {
+                const url = URL.createObjectURL(file);
+                const div = document.createElement('div');
+                div.style.cssText = 'position:relative; display:inline-block; margin-top:5px;';
+                div.innerHTML = `
+                    <img src="${url}" style="width:100px; height:100px; object-fit:cover; border-radius:4px; border:1px solid #ccc;">
+                    <button type="button" onclick="removeEditPhoto(${index})" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-weight:bold; line-height:1; padding:0;">&times;</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function removeEditPhoto(index) {
+            editSelectedPhotos.splice(index, 1);
+            renderEditPreviews();
+        }
+
+        
+    </script>
+    <script src="/static/contextual-help.js?v=20260118b"></script>
+</body>
+</html>
+
+
