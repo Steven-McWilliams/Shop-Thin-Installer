@@ -35,6 +35,37 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _load_config() -> dict:
+    config_path = os.environ.get("INNOSAW_CONFIG_PATH", "config.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _is_paired_config() -> bool:
+    cfg = _load_config()
+    if not isinstance(cfg, dict):
+        return False
+
+    if cfg.get("paired_cloud_shop_id") or cfg.get("paired_at"):
+        return True
+
+    station_tokens = cfg.get("station_tokens")
+    if isinstance(station_tokens, dict) and station_tokens:
+        return True
+
+    cloud_cfg = cfg.get("cloud_v2")
+    if isinstance(cloud_cfg, dict):
+        station_tokens = cloud_cfg.get("station_tokens")
+        if isinstance(station_tokens, dict) and station_tokens:
+            return True
+
+    return False
+
+
 def _get_device_identity() -> dict:
     hostname = platform.node() or "innosaw-pi"
     mac = None
@@ -52,6 +83,8 @@ def _get_device_identity() -> dict:
         tmp.close()
     except Exception:
         lan_ip = ""
+
+    paired = _is_paired_config()
     return {
         "device_id": hostname,
         "hostname": hostname,
@@ -59,7 +92,8 @@ def _get_device_identity() -> dict:
         "product": "thin-pi",
         "version": os.environ.get("INNOSAW_VERSION", "unknown"),
         "kind": "thin-pi-discovery",
-        "state": "discovery",
+        "state": "ready" if paired else "discovery",
+        "discovery_mode": not paired,
         "ip": lan_ip,
     }
 
@@ -73,10 +107,16 @@ def _broadcast_discovery_loop(stop_event: threading.Event, interval_seconds: int
     sock.settimeout(1.0)
     payload = _get_device_identity()
     payload["kind"] = "thin-pi-discovery"
-    payload["state"] = "discovery"
-    payload["discovery_mode"] = True
+    payload["state"] = "ready" if _is_paired_config() else "discovery"
+    payload["discovery_mode"] = not _is_paired_config()
     try:
         while not stop_event.is_set() and time.time() < deadline:
+            payload = _get_device_identity()
+            payload["kind"] = "thin-pi-discovery"
+            payload["state"] = "ready" if _is_paired_config() else "discovery"
+            payload["discovery_mode"] = not _is_paired_config()
+            if payload["discovery_mode"] is False:
+                break
             payload["sent_at"] = time.time()
             try:
                 sock.sendto(json.dumps(payload).encode("utf-8"), ("<broadcast>", port))
@@ -122,7 +162,8 @@ def main() -> int:
 
     discovery_thread = None
     try:
-        if os.environ.get("INNOSAW_DISCOVERY_DISABLE", "0").strip().lower() not in {"1", "true", "yes"}:
+        paired = _is_paired_config()
+        if not paired and os.environ.get("INNOSAW_DISCOVERY_DISABLE", "0").strip().lower() not in {"1", "true", "yes"}:
             discovery_thread = threading.Thread(
                 target=_broadcast_discovery_loop,
                 args=(stop_event,),
