@@ -328,6 +328,7 @@ import os
 script_dir = Path(__file__).parent.absolute()
 template_dirs = [
     script_dir / 'templates',
+    Path('/home/pi/qr-system/templates'),
     Path('/home/pi/qr-scanner/templates'),
     Path(os.getcwd()) / 'templates',
     Path('templates')
@@ -336,10 +337,12 @@ template_dirs = [
 template_folder = None
 template_file = None
 for td in template_dirs:
-    template_path = td / 'shop_dashboard.html'
-    if template_path.exists():
+    # Accept either dashboard template so thin installs do not fail lookup.
+    thin_path = td / 'shop_dashboard_thin.html'
+    full_path = td / 'shop_dashboard.html'
+    if thin_path.exists() or full_path.exists():
         template_folder = str(td)
-        template_file = str(template_path)
+        template_file = str(thin_path if thin_path.exists() else full_path)
         logging.info(f"✅ Found template at: {template_file}")
         break
 
@@ -514,20 +517,41 @@ def _add_cors_headers(resp):
 def dashboard():
     """Main dashboard page"""
     try:
-        # Check if template file exists
-        if template_file and Path(template_file).exists():
-            if _thin_mode_enabled():
-                return render_template('shop_dashboard_thin.html', cloud_url=_cloud_dashboard_url())
-            return render_template('shop_dashboard.html')
-        else:
-            # Try to find template in current working directory
-            cwd_template = Path(os.getcwd()) / 'templates' / 'shop_dashboard.html'
-            if cwd_template.exists():
-                if _thin_mode_enabled():
-                    return render_template('shop_dashboard_thin.html', cloud_url=_cloud_dashboard_url())
-                return render_template('shop_dashboard.html')
-            else:
-                raise FileNotFoundError(f"Template not found. Checked: {template_file if template_file else 'None'}")
+        is_thin = _thin_mode_enabled()
+        preferred_templates = (
+            ['shop_dashboard_thin.html', 'shop_dashboard.html']
+            if is_thin
+            else ['shop_dashboard.html', 'shop_dashboard_thin.html']
+        )
+        search_dirs = [
+            Path(template_folder) if template_folder else None,
+            script_dir / 'templates',
+            Path('/home/pi/qr-system/templates'),
+            Path('/home/pi/qr-scanner/templates'),
+            Path(os.getcwd()) / 'templates',
+            Path('templates'),
+        ]
+
+        selected_template = None
+        checked = []
+        for td in search_dirs:
+            if not td:
+                continue
+            for name in preferred_templates:
+                candidate = td / name
+                checked.append(str(candidate))
+                if candidate.exists():
+                    selected_template = name
+                    break
+            if selected_template:
+                break
+
+        if not selected_template:
+            raise FileNotFoundError(f"Template not found. Checked: {', '.join(checked) if checked else 'None'}")
+
+        if selected_template == 'shop_dashboard_thin.html':
+            return render_template(selected_template, cloud_url=_cloud_dashboard_url())
+        return render_template(selected_template)
     except Exception as e:
         logging.error(f"Template error: {e}", exc_info=True)
         # Return a working dashboard with inline HTML
