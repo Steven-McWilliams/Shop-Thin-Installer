@@ -733,7 +733,19 @@ def scans_page():
 @app.route('/healthz')
 def healthz():
     """Simple health and discovery status for the Thin Pi admin UI."""
-    discovery_enabled = os.environ.get('INNOSAW_DISCOVERY_DISABLE', '0').strip().lower() not in {'1', 'true', 'yes'}
+    paired = False
+    try:
+        cfg_path = _config_path()
+        if cfg_path.exists():
+            with open(cfg_path, 'r') as f:
+                cfg = json.load(f) or {}
+            cloud = cfg.get('cloud_v2', {}) if isinstance(cfg.get('cloud_v2'), dict) else {}
+            tokens = cloud.get('station_tokens') if isinstance(cloud.get('station_tokens'), dict) else {}
+            paired = bool(cfg.get('paired_cloud_shop_id') or cfg.get('paired_at') or tokens)
+    except Exception:
+        paired = False
+
+    discovery_enabled = (not paired) and os.environ.get('INNOSAW_DISCOVERY_DISABLE', '0').strip().lower() not in {'1', 'true', 'yes'}
     return jsonify({
         'status': 'ok',
         'service': 'innosaw-thin',
