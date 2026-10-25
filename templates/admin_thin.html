@@ -261,10 +261,14 @@
                 <button class="btn btn-primary" onclick="runSystemUpdate()" id="update_btn">
                     ⬆️ Update Now
                 </button>
+                <button class="btn" style="background:#7f1d1d;" onclick="rebootPiUnit()" id="reboot_btn">
+                    ⏻ Reboot Pi Unit
+                </button>
                 <span id="update_status" class="small" style="color:#666;"></span>
             </div>
             
             <div class="msg" id="update_msg" style="margin-top:10px;"></div>
+            <div class="msg" id="reboot_msg" style="margin-top:6px;"></div>
             
             <div id="update_output" style="display:none; margin-top:12px; padding:10px; background:#1f2937; color:#e5e7eb; border-radius:6px; font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap;"></div>
             
@@ -791,6 +795,34 @@
                 }, 5000);
             } finally {
                 setUpdateButtonsBusy(false);
+            }
+        }
+
+        async function rebootPiUnit() {
+            if (!confirm('Reboot the full Pi unit now?\n\nThis will disconnect this page for about 30-90 seconds.')) {
+                return;
+            }
+
+            setMsg('reboot_msg', 'Sending reboot command…', true);
+            const rebootBtn = document.getElementById('reboot_btn');
+            if (rebootBtn) rebootBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/thin/system/reboot', { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    setMsg('reboot_msg', data.error || 'Reboot failed.', false);
+                    if (rebootBtn) rebootBtn.disabled = false;
+                    return;
+                }
+
+                setMsg('reboot_msg', data.message || 'Reboot command sent. Reconnecting shortly…', true);
+                setTimeout(() => {
+                    location.reload();
+                }, 45000);
+            } catch (e) {
+                setMsg('reboot_msg', 'Reboot request failed: ' + (e?.message || e), false);
+                if (rebootBtn) rebootBtn.disabled = false;
             }
         }
 

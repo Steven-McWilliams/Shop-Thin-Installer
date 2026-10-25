@@ -3529,6 +3529,31 @@ def thin_system_update():
         return jsonify({'error': str(e), 'success': False}), 400
 
 
+@app.route('/api/thin/system/reboot', methods=['POST'])
+def thin_system_reboot():
+    """Reboot the full Pi unit from the thin admin UI."""
+    if _auth_enabled() and _current_role(session) != 'admin':
+        return jsonify({'error': 'Not authorized. Admin password required.', 'required_role': 'admin'}), 403
+
+    if platform.system() != 'Linux':
+        return jsonify({'error': 'System reboot only available on Linux/Pi'}), 400
+
+    try:
+        subprocess.Popen(
+            ['sudo', 'systemctl', 'reboot'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=str(Path(__file__).resolve().parent),
+        )
+        return jsonify({
+            'success': True,
+            'message': 'Reboot command sent. This Pi will restart in a moment.',
+            'needs_restart': True,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e), 'success': False}), 400
+
+
 @app.route('/api/thin/system/update/check', methods=['GET'])
 def thin_system_update_check():
     """Check GitHub for Thin Pi updates and report pending changes."""

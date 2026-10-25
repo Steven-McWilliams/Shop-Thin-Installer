@@ -89,11 +89,11 @@
       <div class="muted">
         If this Pi was flashed with a normal Raspberry Pi OS image, install the Innosaw Thin service like this:
       </div>
-      <pre class="mono" style="margin-top:10px; white-space:pre-wrap;">curl -fsSL https://raw.githubusercontent.com/Steven-McWilliams/Shop/main/thin_pi/install_thin_pi.sh -o install_thin_pi.sh
-sudo bash install_thin_pi.sh</pre>
+      <pre class="mono" style="margin-top:10px; white-space:pre-wrap;">cd ~ && sudo rm -rf qr-system && git clone https://github.com/Steven-McWilliams/Shop-Thin-Installer.git qr-system && cd qr-system && sudo bash install_thin_pi.sh</pre>
       <div class="muted" style="margin-top:8px;">
-        If the repo is private, raw GitHub URLs require a token. Use a GitHub PAT or clone the repo through authenticated git before running the installer.
+        In-place update (keeps local pairing/tokens):
       </div>
+      <pre class="mono" style="margin-top:8px; white-space:pre-wrap;">cd ~/qr-system && sudo bash thin_pi/thin_pi/update_pi.sh</pre>
     </div>
 
     <div class="card" id="network">
