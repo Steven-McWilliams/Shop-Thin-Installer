@@ -989,16 +989,39 @@ class QRScanner:
             # 1) cloud_v2.station_tokens[station_code] (multi-scanner best practice)
             # 2) cloud_v2.station_token (single-station / shared token)
             token = ""
+            station_code_raw = str(station_code or "").strip()
+
+            def _norm_station_key(v: str) -> str:
+                # Normalize punctuation/casing differences between local mappings and cloud station codes.
+                return re.sub(r'[^a-z0-9]+', '', str(v or '').lower())
+
             station_tokens = self.config.get("cloud_v2.station_tokens", {})
-            if isinstance(station_tokens, dict) and station_code:
+            if isinstance(station_tokens, dict) and station_code_raw:
                 # Be tolerant to casing differences between station config and token map keys.
-                token = (station_tokens.get(station_code) or "").strip()
+                token = (station_tokens.get(station_code_raw) or "").strip()
                 if not token:
-                    token = (station_tokens.get(str(station_code).upper()) or "").strip()
+                    token = (station_tokens.get(str(station_code_raw).upper()) or "").strip()
                 if not token:
-                    token = (station_tokens.get(str(station_code).lower()) or "").strip()
+                    token = (station_tokens.get(str(station_code_raw).lower()) or "").strip()
+                if not token:
+                    wanted = _norm_station_key(station_code_raw)
+                    for k, v in station_tokens.items():
+                        if _norm_station_key(k) == wanted and str(v or '').strip():
+                            token = str(v).strip()
+                            logging.info(
+                                "Cloud v2 token matched by normalized station key local='%s' cloud='%s'",
+                                station_code_raw,
+                                k,
+                            )
+                            break
             if not token:
                 token = (self.config.get("cloud_v2.station_token", "") or "").strip()
+            if (not token) and isinstance(station_tokens, dict):
+                logging.warning(
+                    "cloud_v2 token lookup miss for station_code='%s'. Available token keys=%s",
+                    station_code_raw or "",
+                    sorted([str(k) for k in station_tokens.keys()])[:30],
+                )
             if not token:
                 logging.warning("cloud_v2.enabled=true but missing station token(s); forwarding disabled.")
                 return
