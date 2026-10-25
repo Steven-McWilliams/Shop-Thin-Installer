@@ -3486,11 +3486,16 @@ def thin_system_update():
 
     try:
         install_dir = Path(__file__).resolve().parent
-        update_script = install_dir / 'thin_pi' / 'update_pi.sh'
+        candidates = [
+            install_dir / 'thin_pi' / 'update_pi.sh',
+            install_dir / 'thin_pi' / 'thin_pi' / 'update_pi.sh',
+            install_dir / 'update_pi.sh',
+        ]
+        update_script = next((p for p in candidates if p.exists()), None)
 
-        if not update_script.exists():
+        if update_script is None:
             return jsonify({
-                'error': 'Thin Pi update script not found at thin_pi/update_pi.sh',
+                'error': 'Thin Pi update script not found (checked thin_pi/update_pi.sh and thin_pi/thin_pi/update_pi.sh)',
                 'success': False
             }), 404
 
