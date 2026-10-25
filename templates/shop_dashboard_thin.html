@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Innosaw Thin Scanner - Dashboard</title>
+    <link rel="stylesheet" href="/static/common.css?v=20260408c">
+    <script src="/static/theme.js?v=20260416a"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Scanner Dashboard (Thin)</h1>
+        <div class="subtitle">Local status + mapping + backups. Full logic runs in the cloud.</div>
+        <div class="nav">
+            <a class="active" href="/">Dashboard</a>
+            <a href="/admin">Admin Mapping</a>
+            <a href="/raw_scans">Raw Scans</a>
+            <a href="/help">Help</a>
+            <a href="{{ cloud_url }}" target="_blank" rel="noopener">Cloud Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Status</h2>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+                <div class="card" style="flex:1; min-width:240px;">
+                    <h2 style="margin-bottom:6px;">Service</h2>
+                    <div id="service-status" style="font-size:28px; font-weight:700;">Loading…</div>
+                    <div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Thin scanner service</div>
+                </div>
+                <div class="card" style="flex:1; min-width:240px;">
+                    <h2 style="margin-bottom:6px;">Scanners</h2>
+                    <div id="active-scanners" style="font-size:28px; font-weight:700;">0</div>
+                    <div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Configured / active devices</div>
+                </div>
+                <div class="card" style="flex:1; min-width:240px;">
+                    <h2 style="margin-bottom:6px;">Scans (24h)</h2>
+                    <div id="scan-count" style="font-size:28px; font-weight:700;">0</div>
+                    <div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">Local count</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; font-size: 13px; color: var(--text-secondary);">
+                Tip: If you have cloud service, use <strong>Cloud Dashboard</strong>. If you don’t, you’ll be prompted to log in / request access.
+            </div>
+
+            <div style="margin-top:14px; padding:12px; border:1px solid var(--border-color); border-radius:10px; background:var(--bg-tertiary);">
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-weight:700; color:var(--text-primary);">System Updates</div>
+                        <div style="font-size:12px; color:var(--text-secondary);">Pull the latest Scanner Dashboard code from GitHub and reinstall this unit.</div>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn btn-primary" onclick="runSystemUpdate()" id="update_btn">🔄 Update Scanner Dashboard</button>
+                        <a class="btn btn-secondary" href="/admin">Open Admin</a>
+                    </div>
+                </div>
+                <div id="update_status" style="margin-top:10px; font-size:12px; color:var(--text-secondary);"></div>
+                <div class="msg" id="update_msg" style="margin-top:8px;"></div>
+                <div id="update_output" style="display:none; margin-top:10px; padding:10px; background:#1f2937; color:#e5e7eb; border-radius:6px; font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap;"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Scans (Local Archive)</h2>
+            <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+                These are the last forwarded scans saved locally (works offline too).
+            </div>
+            <div id="recent-scans" style="border:1px solid var(--border-color); border-radius:6px; padding:10px; max-height:260px; overflow:auto; background: var(--bg-tertiary); color: var(--text-primary);">
+                <em>Loading…</em>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function refreshStatus() {
+            try {
+                const res = await fetch('/api/status', { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                document.getElementById('service-status').textContent = (data?.service_status ? 'Running' : (data?.status || 'Unknown'));
+                document.getElementById('active-scanners').textContent = Object.keys(data?.scanners || {}).length;
+                document.getElementById('scan-count').textContent = (data?.recent_scans?.last_24_hours ?? data?.scans_today ?? 0);
+            } catch (e) {
+                document.getElementById('service-status').textContent = 'Error';
+            }
+        }
+
+        async function refreshRecentScans() {
+            const box = document.getElementById('recent-scans');
+            try {
+                const res = await fetch('/api/thin/recent_scans?limit=15', { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                const items = data?.items || [];
+                if (!items.length) {
+                    box.innerHTML = '<em>No scans yet.</em>';
+                    return;
+                }
+                box.innerHTML = items.map(it => {
+                    const ts = (it.timestamp || it.local_timestamp || '').toString();
+                    const station = (it.station_code || it.station || it.station_name || '').toString();
+                    const raw = (it.raw_data || it.data || it.payload || it.qr_data || it.code || '').toString();
+                    const safeRaw = raw.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const src = (data?.source || '').toString();
+                    return `
+                        <div style="padding:8px; border-bottom:1px solid var(--border-color);">
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:baseline;">
+                                <strong>${station || 'Unknown station'}</strong>
+                                <span style="font-size:12px; color:var(--text-secondary);">${ts || ''}</span>
+                                ${src ? `<span style="font-size:12px; color:var(--text-muted);">(${src})</span>` : ``}
+                            </div>
+                            <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px; margin-top:4px;">
+                                ${safeRaw}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                box.innerHTML = '<em>Could not load recent scans.</em>';
+            }
+        }
+
+        async function runSystemUpdate() {
+            const btn = document.getElementById('update_btn');
+            const status = document.getElementById('update_status');
+            const output = document.getElementById('update_output');
+            const msg = document.getElementById('update_msg');
+
+            if (!confirm('This will pull the latest Scanner Dashboard update from GitHub and reinstall this unit.\n\nThe scanner service may restart during the update. Continue?')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Updating...';
+            status.textContent = 'Running update...';
+            msg.className = 'msg';
+            msg.textContent = '';
+            output.style.display = 'none';
+            output.textContent = '';
+
+            try {
+                const res = await fetch('/api/thin/system/update', { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    msg.className = 'msg ok';
+                    msg.textContent = '✅ ' + (data.message || 'Update complete.');
+                    status.textContent = data.needs_restart ? 'Update finished. Manual restart may be needed.' : 'Update successful. Reconnecting...';
+                    if (data.pull_output || data.install_output) {
+                        output.style.display = 'block';
+                        output.textContent = (data.pull_output || '') + '\n' + (data.install_output || '');
+                    }
+                    if (!data.needs_restart) {
+                        setTimeout(() => location.reload(), 4000);
+                    }
+                } else {
+                    msg.className = 'msg err';
+                    msg.textContent = '❌ ' + (data.error || 'Update failed.');
+                    status.textContent = '';
+                    output.style.display = 'block';
+                    output.textContent = data.details || data.error || 'Unknown error';
+                }
+            } catch (e) {
+                msg.className = 'msg err';
+                msg.textContent = '❌ Connection lost - the service may be restarting.';
+                status.textContent = 'Trying to reconnect...';
+                setTimeout(() => location.reload(), 5000);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Update Scanner Dashboard';
+            }
+        }
+
+        refreshStatus();
+        refreshRecentScans();
+        setInterval(refreshStatus, 5000);
+        setInterval(refreshRecentScans, 7000);
+    </script>
+</body>
+</html>
+
+
