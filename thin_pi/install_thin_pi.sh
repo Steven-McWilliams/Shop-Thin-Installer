@@ -18,10 +18,11 @@ INSTALL_DIR="/home/${PI_USER}/qr-system"
 ENV_FILE="/etc/innosaw-thin.env"
 SERVICE_NAME="innosaw-thin"
 # Repo URL for the thin installer.
-# Default points at the active GitHub repo for the full Thin Pi runtime and discovery flow.
+# Default is the public Thin Pi repo used for local thin-device runtime and discovery.
+# Do not point a Thin Pi at the full private app repo or the full shop app repo.
 # To override (internal/dev), set:
-#   INNOSAW_THIN_REPO_URL=https://github.com/Steven-McWilliams/Shop.git
-REPO_URL="${INNOSAW_THIN_REPO_URL:-https://github.com/Steven-McWilliams/Shop.git}"
+#   INNOSAW_THIN_REPO_URL=https://github.com/Steven-McWilliams/Shop-Thin-Installer.git
+REPO_URL="${INNOSAW_THIN_REPO_URL:-https://github.com/Steven-McWilliams/Shop-Thin-Installer.git}"
 
 echo "[1/7] Base packages"
 apt-get update -y
@@ -67,6 +68,7 @@ if [[ ! -d "${INSTALL_DIR}/.git" ]]; then
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
       /thin_pi/install_thin_pi.sh
@@ -97,6 +99,7 @@ else
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
       /thin_pi/install_thin_pi.sh
@@ -134,7 +137,16 @@ INNOSAW_THIN_MODE=1
 EOF
 chmod 600 "${ENV_FILE}"
 
-echo "[7/7] Systemd service"
+echo "[7/8] Passwordless sudo rules for update/reboot"
+SUDOERS_FILE="/etc/sudoers.d/innosaw-thin"
+cat > "${SUDOERS_FILE}" <<EOF
+${PI_USER} ALL=(root) NOPASSWD: /bin/bash ${INSTALL_DIR}/thin_pi/thin_pi/update_pi.sh
+${PI_USER} ALL=(root) NOPASSWD: /bin/bash ${INSTALL_DIR}/thin_pi/update_pi.sh
+${PI_USER} ALL=(root) NOPASSWD: /bin/systemctl reboot
+EOF
+chmod 440 "${SUDOERS_FILE}"
+
+echo "[8/8] Systemd service"
 cp "${INSTALL_DIR}/thin_pi/innosaw-thin.service" "/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Ensure service file points at the correct user/path

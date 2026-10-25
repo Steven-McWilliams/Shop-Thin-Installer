@@ -68,6 +68,7 @@ if [[ ! -d "${INSTALL_DIR}/.git" ]]; then
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
       /thin_pi/install_thin_pi.sh
@@ -98,6 +99,7 @@ else
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
       /thin_pi/install_thin_pi.sh
@@ -135,7 +137,16 @@ INNOSAW_THIN_MODE=1
 EOF
 chmod 600 "${ENV_FILE}"
 
-echo "[7/7] Systemd service"
+echo "[7/8] Passwordless sudo rules for update/reboot"
+SUDOERS_FILE="/etc/sudoers.d/innosaw-thin"
+cat > "${SUDOERS_FILE}" <<EOF
+${PI_USER} ALL=(root) NOPASSWD: /bin/bash ${INSTALL_DIR}/thin_pi/thin_pi/update_pi.sh
+${PI_USER} ALL=(root) NOPASSWD: /bin/bash ${INSTALL_DIR}/thin_pi/update_pi.sh
+${PI_USER} ALL=(root) NOPASSWD: /bin/systemctl reboot
+EOF
+chmod 440 "${SUDOERS_FILE}"
+
+echo "[8/8] Systemd service"
 cp "${INSTALL_DIR}/thin_pi/innosaw-thin.service" "/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Ensure service file points at the correct user/path

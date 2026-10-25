@@ -3500,7 +3500,7 @@ def thin_system_update():
             }), 404
 
         result = subprocess.run(
-            ['sudo', 'bash', str(update_script)],
+            ['sudo', '-n', 'bash', str(update_script)],
             cwd=str(install_dir),
             capture_output=True,
             text=True,
@@ -3509,6 +3509,12 @@ def thin_system_update():
 
         full_output = (result.stdout + '\n' + result.stderr).strip()
         if result.returncode != 0:
+            if 'a password is required' in (result.stderr or '').lower() or 'a terminal is required' in (result.stderr or '').lower():
+                return jsonify({
+                    'error': 'Update requires passwordless sudo for this service user. Re-run install_thin_pi.sh to apply sudoers rules.',
+                    'details': full_output[-2000:] if full_output else 'No output captured',
+                    'success': False,
+                }), 400
             return jsonify({
                 'error': f'Update script failed (exit code {result.returncode})',
                 'details': full_output[-2000:] if full_output else 'No output captured',
@@ -3539,12 +3545,22 @@ def thin_system_reboot():
         return jsonify({'error': 'System reboot only available on Linux/Pi'}), 400
 
     try:
-        subprocess.Popen(
-            ['sudo', 'systemctl', 'reboot'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'reboot'],
             cwd=str(Path(__file__).resolve().parent),
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
+        if result.returncode != 0:
+            details = ((result.stdout or '') + '\n' + (result.stderr or '')).strip()
+            if 'a password is required' in (result.stderr or '').lower() or 'a terminal is required' in (result.stderr or '').lower():
+                return jsonify({
+                    'error': 'Reboot requires passwordless sudo for this service user. Re-run install_thin_pi.sh to apply sudoers rules.',
+                    'details': details[-1000:] if details else 'No output captured',
+                    'success': False,
+                }), 400
+            return jsonify({'error': f'Reboot failed (exit code {result.returncode})', 'details': details[-1000:] if details else '', 'success': False}), 400
         return jsonify({
             'success': True,
             'message': 'Reboot command sent. This Pi will restart in a moment.',
