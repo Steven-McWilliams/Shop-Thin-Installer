@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Innosaw Thin Scanner - Admin Mapping</title>
+    <link rel="stylesheet" href="/static/common.css?v=20251222">
+    <style>
+        .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .msg { margin-top:10px; font-size:13px; }
+        .msg.ok { color:#065f46; }
+        .msg.err { color:#991b1b; }
+        .small { font-size:12px; color:#666; }
+        .field { margin-bottom: 10px; }
+        .field label { display:block; font-weight:600; font-size:12px; margin-bottom:4px; }
+        .field input, .field select { min-width: 260px; }
+        #map_device_input { min-width: 620px; max-width: 100%; }
+        .device-preview { margin-top:6px; font-size:12px; color:#444; }
+        .device-preview .mono { word-break: break-all; }
+        .row-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .clickable tr { cursor:pointer; }
+        .clickable tr:hover { background:#f7fafc; }
+        .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#1f2937; font-size:12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛠️ Admin Mapping (Thin)</h1>
+        <div class="subtitle">Map USB dongles to stations. No other admin tools run locally in thin mode.</div>
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a class="active" href="/admin">Admin Mapping</a>
+            <a href="/raw_scans">Raw Scans</a>
+            <a href="/help">Help</a>
+            <a href="{{ cloud_url }}" target="_blank" rel="noopener">Cloud Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card" id="discovery_status_card" style="border-left: 4px solid #f59e0b; background: linear-gradient(135deg, #fff7ed, #fff);">
+            <h2>🔎 Discovery Status</h2>
+            <div class="small" style="margin-bottom:8px;">This Pi is configured to broadcast on the LAN while it is in discovery mode.</div>
+            <div id="thin_discovery_status" class="msg ok">Checking discovery status…</div>
+        </div>
+
+        <div class="card">
+            <h2>Detect USB Dongles</h2>
+            <div class="row">
+                <button class="btn btn-primary" onclick="detectDongles()">Detect</button>
+                <span class="small">Plug in dongles first. We prefer <span class="mono">/dev/input/by-path</span> stable paths.</span>
+            </div>
+            <div class="msg" id="dongle_msg"></div>
+            <div id="detected_dongles" style="margin-top:10px; border:1px solid #eee; border-radius:6px; padding:10px; max-height:220px; overflow:auto;">
+                <em>Click Detect to list devices…</em>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Station Mapping</h2>
+            <div class="small">This writes to <span class="mono">config.json</span> → <span class="mono">scanners{}</span>.</div>
+            <!-- Row 1: Device selection (full-width) -->
+            <div class="row" style="margin-top:10px;">
+                <div class="field" style="flex: 1; min-width: 520px;">
+                    <label>Device Path</label>
+                    <input id="map_device_input" list="device_list" placeholder="/dev/input/by-path/..." />
+                    <datalist id="device_list"></datalist>
+                    <div class="device-preview">
+                        Selected: <span class="mono" id="device_preview">(none)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Station + name + actions -->
+            <div class="row" style="margin-top:6px;">
+                <div class="field">
+                    <label>Station Code</label>
+                    <input id="map_station" list="station_list" placeholder="Station code (must match cloud)" />
+                    <datalist id="station_list"></datalist>
+                    <div class="small">Tip: after pairing, this list auto-populates from cloud stations.</div>
+                </div>
+                <div class="field">
+                    <label>Display Name (optional)</label>
+                    <input id="map_name" placeholder="H10 CNC">
+                </div>
+                <div class="row-actions">
+                    <button class="btn btn-primary" onclick="saveMapping()">Save</button>
+                    <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+                    <button class="btn" style="background:#7f1d1d;" onclick="deleteSelected()">Delete</button>
+                    <button class="btn btn-secondary" onclick="loadMappings()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="msg" id="map_msg"></div>
+            <div class="small" id="selected_hint" style="margin-top:6px;"></div>
+            <div style="margin-top:12px; overflow:auto; max-height:420px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Device Path</th>
+                            <th>Station</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody id="map_tbody" class="clickable">
+                        <tr><td colspan="3">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Backup (Download)</h2>
+            <div class="small">For support: download your local config + any local scan/archive/queue/log files. No import is needed on thin.</div>
+            <div class="row" style="margin-top:10px;">
+                <a class="btn btn-primary" href="/api/thin/backup/download">Download Backup ZIP</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Cloud Pairing (No manual tokens)</h2>
+            <div class="small">
+                Generate a pairing code in Cloud Admin → “Pair a Pi”, then enter it here. This Pi will automatically fetch station tokens and save them locally.
+            </div>
+            <div class="row" style="margin-top:10px;">
+                <div class="field">
+                    <label>Cloud Base URL</label>
+                    <input id="pair_base_url" value="{{ cloud_url.rstrip('/') }}" placeholder="https://v2.innosaw.work">
+                    <div class="small" style="margin-top:4px; color:#666;">
+                        If cloud runs on this Pi: http://127.0.0.1:5010. If cloud runs on another machine, use that machine's LAN IP (example: http://192.168.1.50:5010).
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Pairing Code</label>
+                    <input id="pair_code" placeholder="paste code">
+                </div>
+                <button class="btn btn-primary" onclick="pairNow()">Pair</button>
+            </div>
+            <div class="msg" id="pair_msg"></div>
+        </div>
+
+        <div class="card">
+            <h2>Raw Scan Data</h2>
+            <div class="small">View / download raw scans locally (no cloud parsing).</div>
+            <div class="row" style="margin-top:10px;">
+                <a class="btn btn-secondary" href="/raw_scans">View Raw Scans</a>
+                <a class="btn btn-primary" href="/api/thin/raw_scans/download">Download Raw JSONL</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Clear Local Scan Data (for imaging)</h2>
+            <div class="small">
+                This deletes local scan artifacts on this Pi (archive/queue/logs). Use this before cloning an SD card image.
+                It does <strong>not</strong> change your station mappings or cloud tokens.
+            </div>
+            <div class="row" style="margin-top:10px;">
+                <button class="btn btn-secondary" onclick="clearLocalData()">Clear Local Data</button>
+            </div>
+            <div class="msg" id="clear_msg"></div>
+        </div>
+
+        <div class="card">
+            <h2>🌐 Network Settings</h2>
+            <div class="small">Switch between Ethernet (cable) and WiFi. Connect this Pi to your shop's network.</div>
+
+            <!-- Current Status -->
+            <div style="margin-top:12px; padding:12px; background:#f8f9fa; border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <strong>Current Connection:</strong>
+                        <span id="net_status_type" class="pill" style="margin-left:8px;">Loading…</span>
+                    </div>
+                    <button class="btn btn-secondary" onclick="refreshNetworkStatus()" style="padding:6px 12px;">↻ Refresh</button>
+                </div>
+                <div id="net_status_details" class="small" style="margin-top:8px;"></div>
+            </div>
+
+            <!-- WiFi Section -->
+            <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <strong>📶 WiFi Networks</strong>
+                    <div class="row" style="gap:8px;">
+                        <button class="btn btn-primary" onclick="scanWifi()" style="padding:6px 12px;">Scan</button>
+                        <button class="btn btn-secondary" onclick="showManualWifi()" style="padding:6px 12px;">Manual</button>
+                        <button class="btn btn-secondary" onclick="disconnectWifi()" style="padding:6px 12px;">Disconnect</button>
+                    </div>
+                </div>
+                <div class="msg" id="wifi_msg"></div>
+                <div id="wifi_networks" style="margin-top:10px; max-height:300px; overflow-y:auto; border:1px solid #eee; border-radius:6px;">
+                    <div style="padding:12px; color:#666; text-align:center;">Click "Scan" to find available WiFi networks</div>
+                </div>
+            </div>
+
+            <!-- Manual WiFi Configuration -->
+            <div id="wifi_manual_form" style="display:none; margin-top:16px; padding:12px; background:#fef3c7; border-radius:8px; border:1px solid #fbbf24;">
+                <div style="font-weight:600; margin-bottom:8px;">📝 Manual WiFi Configuration</div>
+                <div class="small" style="margin-bottom:10px;">Use this if your network doesn't appear in the scan (hidden SSID or weak signal).</div>
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                    <div class="field" style="flex:1; min-width:180px; margin-bottom:0;">
+                        <label>Network Name (SSID)</label>
+                        <input type="text" id="wifi_manual_ssid" placeholder="Enter WiFi name" />
+                    </div>
+                    <div class="field" style="flex:1; min-width:180px; margin-bottom:0;">
+                        <label>Password</label>
+                        <input type="password" id="wifi_manual_password" placeholder="Enter password (or leave blank)" />
+                    </div>
+                </div>
+                <div class="row" style="gap:8px; margin-top:10px;">
+                    <button class="btn btn-primary" onclick="connectManualWifi()">Connect</button>
+                    <button class="btn btn-secondary" onclick="cancelManualWifi()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Connect to WiFi Form -->
+            <div id="wifi_connect_form" style="display:none; margin-top:16px; padding:12px; background:#f0f9ff; border-radius:8px; border:1px solid #bae6fd;">
+                <div style="font-weight:600; margin-bottom:8px;">Connect to: <span id="wifi_connect_ssid"></span></div>
+                <div class="row" style="gap:10px; align-items:end;">
+                    <div class="field" style="flex:1; min-width:200px; margin-bottom:0;">
+                        <label>Password</label>
+                        <input type="password" id="wifi_password" placeholder="Enter WiFi password" />
+                    </div>
+                    <button class="btn btn-primary" onclick="connectToWifi()">Connect</button>
+                    <button class="btn btn-secondary" onclick="cancelWifiConnect()">Cancel</button>
+                </div>
+                <div class="small" style="margin-top:6px;">Leave blank for open networks (no password).</div>
+            </div>
+
+            <!-- Saved Networks -->
+            <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <strong>💾 Saved Connections</strong>
+                    <button class="btn btn-secondary" onclick="loadSavedNetworks()" style="padding:6px 12px;">Refresh</button>
+                </div>
+                <div id="saved_networks" style="margin-top:10px;">
+                    <div class="small" style="color:#666;">Loading saved connections...</div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="small" style="margin-top:16px; padding:10px; background:#fffbeb; border-radius:6px; border:1px solid #fde68a;">
+                <strong>💡 Tips:</strong>
+                <ul style="margin:6px 0 0 16px; padding:0;">
+                    <li>Connect via <strong>Ethernet cable first</strong> to configure WiFi settings</li>
+                    <li>After WiFi connects, you can unplug the Ethernet cable</li>
+                    <li>The Pi will auto-reconnect to saved WiFi networks on reboot</li>
+                    <li>If you lose connection, plug in Ethernet again to reconfigure</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- System Updates Section -->
+        <div class="card">
+            <h2>🔄 System Updates</h2>
+            <div class="small">Check for and install the latest Thin Pi software updates from Innosaw.</div>
+            
+            <div style="margin-top:12px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <button class="btn btn-secondary" onclick="checkSystemUpdate()" id="check_update_btn">
+                    🔎 Check GitHub Updates
+                </button>
+                <button class="btn btn-primary" onclick="runSystemUpdate()" id="update_btn">
+                    ⬆️ Update Now
+                </button>
+                <span id="update_status" class="small" style="color:#666;"></span>
+            </div>
+            
+            <div class="msg" id="update_msg" style="margin-top:10px;"></div>
+            
+            <div id="update_output" style="display:none; margin-top:12px; padding:10px; background:#1f2937; color:#e5e7eb; border-radius:6px; font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap;"></div>
+            
+            <div class="small" style="margin-top:12px; padding:10px; background:#f0fdf4; border-radius:6px; border:1px solid #86efac;">
+                <strong>ℹ️ What this does:</strong>
+                <ul style="margin:6px 0 0 16px; padding:0;">
+                    <li>Downloads the latest code from Innosaw's servers</li>
+                    <li>Installs any new dependencies</li>
+                    <li>Restarts the Pi service automatically</li>
+                    <li>Your scanner mappings and settings are preserved</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let donglesCache = [];
+        let mappingsCache = [];
+        let selectedDevicePath = '';
+        let selectedWifiSSID = '';
+
+        function setMsg(id, text, ok) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.className = 'msg ' + (ok ? 'ok' : 'err');
+            el.textContent = text || '';
+        }
+
+        async function refreshDiscoveryStatus() {
+            const el = document.getElementById('thin_discovery_status');
+            if (!el) return;
+            try {
+                const res = await fetch('/healthz');
+                const data = await res.json();
+                if (res.ok && data && data.discovery_mode) {
+                    el.className = 'msg ok';
+                    el.textContent = `Discovery mode is active. This Pi is broadcasting on UDP ${data.discovery_port || 5011} and waiting for the local server to approve it.`;
+                    return;
+                }
+                el.className = 'msg err';
+                el.textContent = 'Discovery mode is disabled or the service is not responding.';
+            } catch (e) {
+                el.className = 'msg err';
+                el.textContent = 'Discovery status unavailable. Check that the Thin Pi service is running.';
+            }
+        }
+
+        function populateDeviceList() {
+            const dl = document.getElementById('device_list');
+            if (!dl) return;
+            dl.innerHTML = '';
+            const opts = new Set();
+            (donglesCache || []).forEach(d => {
+                const p = (d?.stable_path || d?.path || '').toString().trim();
+                if (p) opts.add(p);
+            });
+            (mappingsCache || []).forEach(m => {
+                const p = (m?.device_path || '').toString().trim();
+                if (p) opts.add(p);
+            });
+            Array.from(opts).sort().forEach(p => {
+                const o = document.createElement('option');
+                o.value = p;
+                dl.appendChild(o);
+            });
+        }
+
+        async function detectDongles() {
+            setMsg('dongle_msg', 'Detecting…', true);
+            try {
+                // Refresh mappings cache first so indicators are accurate
+                try {
+                    const mRes = await fetch('/api/admin/stations');
+                    const mData = await mRes.json();
+                    if (mRes.ok && mData.stations) mappingsCache = mData.stations;
+                } catch(e) { console.warn('Could not refresh mappings for indicators', e); }
+
+                const res = await fetch('/api/admin/dongles/detect');
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('dongle_msg', data.error || res.statusText, false);
+                    return;
+                }
+                donglesCache = data.scanners || [];
+                renderDongles();
+                setMsg('dongle_msg', `Found ${donglesCache.length} device(s)`, true);
+                populateDeviceList();
+            } catch (e) {
+                setMsg('dongle_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        function renderDongles() {
+            const el = document.getElementById('detected_dongles');
+            if (!el) return;
+            el.innerHTML = donglesCache.length
+                ? donglesCache.map(d => {
+                    const path = (d.stable_path || d.path || '').toString();
+                    const mapped = mappingsCache.find(m => m.device_path === path);
+                    const inUseHtml = mapped 
+                        ? `<span class="pill" style="background:#fef3c7; color:#92400e; margin-left:8px; border:1px solid #fde68a;">Mapped to: <strong>${mapped.station_code}</strong></span>` 
+                        : '';
+                    
+                    return `
+                    <div style="padding: 8px; border-bottom: 1px solid #eee; background: ${mapped ? '#fffcf0' : 'transparent'};">
+                        <div style="display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;">
+                            <strong>${(d.name || 'Unknown')}</strong>
+                            ${inUseHtml}
+                            <button class="btn btn-secondary" style="padding:6px 10px; margin-left:auto;" onclick="useDevice('${String(path).replace(/'/g,'&#39;')}')">${mapped ? 'Edit' : 'Use'}</button>
+                        </div>
+                        <div class="mono small">${path}</div>
+                    </div>
+                `;}).join('')
+                : '<em>No devices detected.</em>';
+        }
+
+        function useDevice(path) {
+            const dp = (path || '').toString().replace(/&#39;/g, "'").trim();
+            document.getElementById('map_device_input').value = dp;
+            document.getElementById('device_preview').textContent = dp || '(none)';
+        }
+
+        function clearForm() {
+            selectedDevicePath = '';
+            document.getElementById('map_device_input').value = '';
+            document.getElementById('map_station').value = '';
+            document.getElementById('map_name').value = '';
+            document.getElementById('selected_hint').textContent = '';
+            document.getElementById('device_preview').textContent = '(none)';
+            setMsg('map_msg', '', true);
+        }
+
+        async function loadMappings() {
+            const tbody = document.getElementById('map_tbody');
+            tbody.innerHTML = '<tr><td colspan="3">Loading…</td></tr>';
+            try {
+                const res = await fetch('/api/admin/stations');
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    tbody.innerHTML = `<tr><td colspan="3">${data.error || res.statusText}</td></tr>`;
+                    return;
+                }
+                mappingsCache = data.stations || [];
+                populateDeviceList();
+                if (!mappingsCache.length) {
+                    tbody.innerHTML = '<tr><td colspan="3"><em>No mappings yet.</em></td></tr>';
+                    return;
+                }
+                const esc = (v) => String(v ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+
+                tbody.innerHTML = mappingsCache.map(s => {
+                    const dp = esc(s.device_path || '');
+                    const sc = esc(s.station_code || '');
+                    const dn = esc(s.display_name || '');
+                    return `
+                        <tr data-device="${dp}">
+                            <td class="mono">${dp}</td>
+                            <td>${sc}</td>
+                            <td>${dn}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="3">Error: ${e.message}</td></tr>`;
+            }
+        }
+
+        function selectRow(devicePath) {
+            const row = (mappingsCache || []).find(m => (m.device_path || '') === devicePath);
+            if (!row) return;
+            selectedDevicePath = devicePath;
+            document.getElementById('map_device_input').value = devicePath;
+            if (row.station_code) document.getElementById('map_station').value = row.station_code;
+            document.getElementById('map_name').value = row.display_name || '';
+            document.getElementById('selected_hint').innerHTML = `Selected: <span class="pill mono">${devicePath}</span>`;
+        }
+
+        async function saveMapping() {
+            const dp = (document.getElementById('map_device_input').value || '').trim();
+            const sc = (document.getElementById('map_station').value || '').trim();
+            const dn = (document.getElementById('map_name').value || '').trim();
+            if (!dp || !sc) {
+                setMsg('map_msg', 'Select a device path and station code.', false);
+                return;
+            }
+            setMsg('map_msg', 'Saving…', true);
+            try {
+                // Fetch existing mappings first
+                const curRes = await fetch('/api/admin/stations');
+                const cur = await curRes.json();
+                const stations = (cur.stations || []);
+                // Update or insert
+                const next = [];
+                let found = false;
+                stations.forEach(s => {
+                    if ((s.device_path || '') === dp) {
+                        found = true;
+                        next.push({ device_path: dp, station_code: sc, display_name: dn || sc });
+                    } else {
+                        next.push({ device_path: s.device_path, station_code: s.station_code, display_name: s.display_name });
+                    }
+                });
+                if (!found) {
+                    next.push({ device_path: dp, station_code: sc, display_name: dn || sc });
+                }
+                const res = await fetch('/api/admin/stations', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ stations: next })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('map_msg', data.error || res.statusText, false);
+                    return;
+                }
+                setMsg('map_msg', 'Saved mapping.', true);
+                clearForm();
+                await loadMappings();
+                // Refresh detection list to update indicators
+                if (donglesCache.length > 0) renderDongles();
+            } catch (e) {
+                setMsg('map_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        async function deleteSelected() {
+            const dp = (document.getElementById('map_device_input').value || '').trim();
+            if (!dp) {
+                setMsg('map_msg', 'Select a mapping row or enter a device path to delete.', false);
+                return;
+            }
+            if (!confirm(`Delete mapping for:\n${dp}\n\nThis only removes the station mapping on this Pi.`)) return;
+            setMsg('map_msg', 'Deleting…', true);
+            try {
+                const curRes = await fetch('/api/admin/stations');
+                const cur = await curRes.json();
+                const stations = (cur.stations || []).filter(s => (s.device_path || '') !== dp);
+                const res = await fetch('/api/admin/stations', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ stations })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('map_msg', data.error || res.statusText, false);
+                    return;
+                }
+                setMsg('map_msg', 'Deleted mapping.', true);
+                clearForm();
+                await loadMappings();
+                // Refresh detection list to update indicators
+                if (donglesCache.length > 0) renderDongles();
+            } catch (e) {
+                setMsg('map_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        async function pairNow() {
+            const baseUrlInput = document.getElementById('pair_base_url');
+            const baseUrl = normalizeCloudBaseUrl(baseUrlInput ? baseUrlInput.value : '');
+            const code = (document.getElementById('pair_code').value || '').trim();
+            if (!baseUrl || !code) {
+                setMsg('pair_msg', 'Cloud base URL and pairing code are required.', false);
+                return;
+            }
+            if (baseUrlInput) {
+                baseUrlInput.value = baseUrl;
+            }
+            setMsg('pair_msg', 'Pairing…', true);
+            try {
+                const res = await fetch('/api/thin/pair/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_url: baseUrl, code })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    const err = data.error || res.statusText;
+                    const hint = data.hint ? ` ${data.hint}` : '';
+                    setMsg('pair_msg', `${err}${hint}`, false);
+                    return;
+                }
+                const count = Object.keys(data.station_tokens || {}).length;
+                setMsg('pair_msg', `Paired successfully. Received ${count} station token(s).`, true);
+                // Clear code after successful pairing
+                document.getElementById('pair_code').value = '';
+                // Refresh station list from cloud so dropdowns match (avoid typos)
+                await refreshCloudStations();
+            } catch (e) {
+                setMsg('pair_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        function normalizeCloudBaseUrl(raw) {
+            let v = String(raw || '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+            if (!v) return '';
+
+            while (/^https?:\/\/https?:\/\//i.test(v)) {
+                v = v.replace(/^https?:\/\//i, '');
+            }
+
+            if (!/^https?:\/\//i.test(v)) {
+                const host = v.split('/')[0].split(':')[0].toLowerCase();
+                const isLocal = host === 'localhost'
+                    || host.endsWith('.local')
+                    || host.startsWith('127.')
+                    || host.startsWith('10.')
+                    || host.startsWith('192.168.')
+                    || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
+                v = `${isLocal ? 'http' : 'https'}://${v}`;
+            }
+
+            try {
+                const u = new URL(v);
+                return `${u.protocol}//${u.host}`.replace(/\/+$/, '');
+            } catch (_) {
+                return v;
+            }
+        }
+
+        async function clearLocalData() {
+            const ok = confirm('Clear local scan data on this Pi?\\n\\nThis will delete local archives/queues/logs. This cannot be undone.');
+            if (!ok) return;
+            setMsg('clear_msg', 'Clearing…', true);
+            try {
+                const res = await fetch('/api/thin/clear_local_data', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('clear_msg', data.error || res.statusText, false);
+                    return;
+                }
+                const n = (data.deleted || []).length;
+                const e = (data.errors || []).length;
+                setMsg('clear_msg', e ? `Cleared with ${e} error(s). Deleted ${n} item(s).` : `Cleared. Deleted ${n} item(s).`, !e);
+            } catch (e) {
+                setMsg('clear_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        async function refreshCloudStations() {
+            try {
+                const res = await fetch('/api/thin/cloud/stations');
+                const data = await res.json();
+                if (!res.ok || data.error) return;
+                const stations = data.stations || [];
+                if (!stations.length) return;
+                const dl = document.getElementById('station_list');
+                if (!dl) return;
+                const current = (document.getElementById('map_station').value || '').trim();
+                dl.innerHTML = '';
+                stations.forEach(s => {
+                    const code = (s.station_code || '').toString().trim();
+                    const name = (s.display_name || '').toString().trim();
+                    if (!code) return;
+                    const o = document.createElement('option');
+                    o.value = code;
+                    // Some browsers show label text in the dropdown; value remains the station_code.
+                    if (name) o.label = name;
+                    dl.appendChild(o);
+                });
+                // Keep any typed value unchanged
+                if (current) document.getElementById('map_station').value = current;
+            } catch {
+                // ignore
+            }
+        }
+
+        // Row click → load into editor (avoid inline onclick string escaping issues)
+        document.getElementById('map_tbody').addEventListener('click', (e) => {
+            const tr = e.target && e.target.closest ? e.target.closest('tr[data-device]') : null;
+            if (!tr) return;
+            const dp = tr.dataset.device || '';
+            if (dp) {
+                selectRow(dp);
+                document.getElementById('device_preview').textContent = dp || '(none)';
+            }
+        });
+
+        // keep preview synced while typing
+        document.getElementById('map_device_input').addEventListener('input', () => {
+            const v = (document.getElementById('map_device_input').value || '').trim();
+            document.getElementById('device_preview').textContent = v || '(none)';
+        });
+
+        // ============= SYSTEM UPDATE FUNCTIONS =============
+
+        let updateCheckCache = null;
+
+        function setUpdateButtonsBusy(busy, checkText = '🔎 Check GitHub Updates', updateText = '⬆️ Update Now') {
+            const checkBtn = document.getElementById('check_update_btn');
+            const updateBtn = document.getElementById('update_btn');
+            if (checkBtn) {
+                checkBtn.disabled = busy;
+                checkBtn.textContent = checkText;
+            }
+            if (updateBtn) {
+                updateBtn.disabled = busy;
+                updateBtn.textContent = updateText;
+            }
+        }
+
+        async function checkSystemUpdate() {
+            const status = document.getElementById('update_status');
+            const output = document.getElementById('update_output');
+
+            setUpdateButtonsBusy(true, '⏳ Checking...', '⬆️ Update Now');
+            setMsg('update_msg', '', true);
+            status.textContent = 'Checking GitHub...';
+            output.style.display = 'none';
+            output.textContent = '';
+
+            try {
+                const res = await fetch('/api/thin/system/update/check');
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    updateCheckCache = null;
+                    setMsg('update_msg', '❌ ' + (data.error || 'Update check failed'), false);
+                    status.textContent = '';
+                    return;
+                }
+
+                updateCheckCache = data;
+                const localShort = (data.local_sha || '').slice(0, 8);
+                const remoteShort = (data.remote_sha || '').slice(0, 8);
+
+                if (data.update_available) {
+                    setMsg('update_msg', `✅ Update available on ${data.branch}: ${localShort} → ${remoteShort}`, true);
+                } else {
+                    setMsg('update_msg', `✅ Already up to date on ${data.branch} (${localShort})`, true);
+                }
+
+                status.textContent = `Behind: ${data.commits_behind || 0}, Ahead: ${data.commits_ahead || 0}, Files changed: ${data.changed_files_total || 0}`;
+
+                const changed = Array.isArray(data.changed_files) ? data.changed_files : [];
+                const lines = [];
+                lines.push(`Branch: ${data.branch || ''}`);
+                lines.push(`Local:  ${(data.local_sha || '').trim()}`);
+                lines.push(`Remote: ${(data.remote_sha || '').trim()}`);
+                lines.push('');
+                if (!changed.length) {
+                    lines.push('No file changes detected.');
+                } else {
+                    lines.push(`Changed files (${Math.min(changed.length, 120)} shown):`);
+                    for (const f of changed) lines.push(` - ${f}`);
+                    if ((data.changed_files_total || 0) > changed.length) {
+                        lines.push(`...and ${data.changed_files_total - changed.length} more`);
+                    }
+                }
+                output.textContent = lines.join('\n');
+                output.style.display = 'block';
+            } catch (e) {
+                updateCheckCache = null;
+                setMsg('update_msg', '❌ Could not reach update API: ' + (e?.message || e), false);
+                status.textContent = '';
+            } finally {
+                setUpdateButtonsBusy(false);
+            }
+        }
+
+        async function runSystemUpdate() {
+            const status = document.getElementById('update_status');
+            const output = document.getElementById('update_output');
+
+            if (!updateCheckCache) {
+                await checkSystemUpdate();
+            }
+
+            if (updateCheckCache && !updateCheckCache.update_available) {
+                setMsg('update_msg', 'No update is currently available from GitHub.', true);
+                return;
+            }
+            
+            if (!confirm('This will download and install the latest Thin Pi software.\n\nThe service will restart after the update. You may briefly lose connection to this page.\n\nContinue?')) {
+                return;
+            }
+            
+            setUpdateButtonsBusy(true, '🔎 Check GitHub Updates', '⏳ Updating...');
+            status.textContent = 'Please wait, this may take a few minutes...';
+            output.style.display = 'none';
+            setMsg('update_msg', '', true);
+            
+            try {
+                const res = await fetch('/api/thin/system/update', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok && data.success) {
+                    setMsg('update_msg', '✅ ' + (data.message || 'Update complete!'), true);
+                    if (data.pull_output || data.install_output) {
+                        output.style.display = 'block';
+                        output.textContent = (data.pull_output || '') + '\n' + (data.install_output || '');
+                    }
+                    status.textContent = 'Update successful!';
+                    
+                    // If service restarted, we might lose connection
+                    if (!data.needs_restart) {
+                        setTimeout(() => {
+                            status.textContent = 'Reconnecting...';
+                            setTimeout(() => location.reload(), 3000);
+                        }, 2000);
+                    }
+                } else {
+                    setMsg('update_msg', '❌ ' + (data.error || 'Update failed'), false);
+                    status.textContent = '';
+                    // Show full details if available
+                    output.style.display = 'block';
+                    output.textContent = data.details || data.error || 'Unknown error';
+                }
+            } catch (e) {
+                setMsg('update_msg', '❌ Connection lost - the service may be restarting', false);
+                status.textContent = 'Attempting to reconnect...';
+                // Try to reconnect after a delay
+                setTimeout(() => {
+                    location.reload();
+                }, 5000);
+            } finally {
+                setUpdateButtonsBusy(false);
+            }
+        }
+
+        // ============= NETWORK SETTINGS FUNCTIONS =============
+
+        async function refreshNetworkStatus() {
+            const typeEl = document.getElementById('net_status_type');
+            const detailsEl = document.getElementById('net_status_details');
+            typeEl.textContent = 'Checking…';
+            typeEl.style.background = '#e0e7ff';
+            detailsEl.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/thin/network/status');
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    typeEl.textContent = 'Error';
+                    typeEl.style.background = '#fee2e2';
+                    detailsEl.textContent = data.error || 'Failed to get status';
+                    return;
+                }
+
+                // Update connection type badge
+                const connType = data.connection_type || 'unknown';
+                if (connType === 'ethernet') {
+                    typeEl.textContent = '🔌 Ethernet';
+                    typeEl.style.background = '#d1fae5';
+                } else if (connType === 'wifi') {
+                    typeEl.textContent = '📶 WiFi' + (data.wifi_ssid ? `: ${data.wifi_ssid}` : '');
+                    typeEl.style.background = '#dbeafe';
+                } else if (connType === 'disconnected') {
+                    typeEl.textContent = '❌ Disconnected';
+                    typeEl.style.background = '#fee2e2';
+                } else {
+                    typeEl.textContent = connType;
+                    typeEl.style.background = '#f3f4f6';
+                }
+
+                // Show IP addresses
+                let details = [];
+                if (data.hostname) details.push(`Hostname: <strong>${data.hostname}</strong>`);
+                if (data.ip_addresses && data.ip_addresses.length) {
+                    const ips = data.ip_addresses.map(i => `${i.device}: <span class="mono">${i.ip}</span>`).join(', ');
+                    details.push(`IP: ${ips}`);
+                }
+                if (data.ethernet_connected && data.wifi_connected) {
+                    details.push('<span style="color:#059669;">Both Ethernet and WiFi connected</span>');
+                }
+                detailsEl.innerHTML = details.join(' &nbsp;|&nbsp; ');
+
+            } catch (e) {
+                typeEl.textContent = 'Error';
+                typeEl.style.background = '#fee2e2';
+                detailsEl.textContent = e.message;
+            }
+        }
+
+        // Trigger a background WiFi rescan when page loads so first scan shows all networks
+        async function triggerBackgroundWifiRescan() {
+            try {
+                // Just trigger rescan - don't wait for or display results
+                await fetch('/api/thin/network/wifi/scan');
+            } catch (e) {
+                // Ignore errors - this is just a background warmup
+            }
+        }
+
+        async function scanWifi() {
+            setMsg('wifi_msg', 'Scanning for networks (this takes a few seconds)…', true);
+            const container = document.getElementById('wifi_networks');
+            container.innerHTML = '<div style="padding:12px; color:#666; text-align:center;">Scanning…</div>';
+
+            try {
+                const res = await fetch('/api/thin/network/wifi/scan');
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    setMsg('wifi_msg', data.error || 'Failed to scan', false);
+                    container.innerHTML = '<div style="padding:12px; color:#991b1b;">Scan failed. Make sure WiFi hardware is available.</div>';
+                    return;
+                }
+
+                const networks = data.networks || [];
+                if (!networks.length) {
+                    setMsg('wifi_msg', 'No networks found', false);
+                    container.innerHTML = '<div style="padding:12px; color:#666;">No WiFi networks detected. Try again.</div>';
+                    return;
+                }
+
+                setMsg('wifi_msg', `Found ${networks.length} network(s)`, true);
+                container.innerHTML = networks.map(n => {
+                    const signalBars = n.signal >= 75 ? '▂▄▆█' : n.signal >= 50 ? '▂▄▆░' : n.signal >= 25 ? '▂▄░░' : '▂░░░';
+                    const securityIcon = n.security ? '🔒' : '🔓';
+                    const connectedBadge = n.connected ? '<span class="pill" style="background:#d1fae5; color:#065f46; margin-left:8px;">Connected</span>' : '';
+                    return `
+                        <div style="padding:10px 12px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                            <div>
+                                <strong>${escapeHtml(n.ssid)}</strong> ${connectedBadge}
+                                <div class="small">${securityIcon} ${n.security || 'Open'} &nbsp; ${signalBars} ${n.signal}%</div>
+                            </div>
+                            <button class="btn btn-secondary" style="padding:6px 12px;" onclick="showWifiConnect('${escapeAttr(n.ssid)}', ${!n.security})">
+                                ${n.connected ? 'Reconnect' : 'Connect'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                setMsg('wifi_msg', e.message, false);
+                container.innerHTML = '<div style="padding:12px; color:#991b1b;">Error scanning.</div>';
+            }
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function escapeAttr(str) {
+            return (str || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function showNetworkChangeWarning(newSSID) {
+            const msg = `⚠️ IMPORTANT: Changing WiFi Networks
+
+When you connect to "${newSSID}", the Pi will get a NEW IP address and you will lose access to this page.
+
+TO FIND THE NEW IP ADDRESS:
+1. Connect a monitor/TV to the Pi's HDMI port
+2. The IP address will be displayed on screen
+3. Access the Pi at the new address: http://[NEW-IP]:5006/admin
+
+RECOMMENDED: Set a static IP in your router
+• Log into your router (usually 192.168.1.1 or 192.168.0.1)
+• Find DHCP Reservation or Static IP settings
+• Assign a fixed IP to the Pi's MAC address
+• This ensures the IP never changes
+
+Do you want to proceed with connecting to ${newSSID}?`;
+
+            return confirm(msg);
+        }
+
+        function showWifiConnect(ssid, isOpen) {
+            selectedWifiSSID = ssid;
+            document.getElementById('wifi_connect_ssid').textContent = ssid;
+            document.getElementById('wifi_password').value = '';
+            document.getElementById('wifi_connect_form').style.display = 'block';
+            document.getElementById('wifi_manual_form').style.display = 'none';
+            if (!isOpen) {
+                document.getElementById('wifi_password').focus();
+            }
+        }
+
+        function cancelWifiConnect() {
+            selectedWifiSSID = '';
+            document.getElementById('wifi_connect_form').style.display = 'none';
+        }
+
+        function showManualWifi() {
+            document.getElementById('wifi_manual_form').style.display = 'block';
+            document.getElementById('wifi_connect_form').style.display = 'none';
+            document.getElementById('wifi_manual_ssid').value = '';
+            document.getElementById('wifi_manual_password').value = '';
+            document.getElementById('wifi_manual_ssid').focus();
+        }
+
+        function cancelManualWifi() {
+            document.getElementById('wifi_manual_form').style.display = 'none';
+        }
+
+        async function connectManualWifi() {
+            const ssid = document.getElementById('wifi_manual_ssid').value.trim();
+            const password = document.getElementById('wifi_manual_password').value;
+
+            if (!ssid) {
+                setMsg('wifi_msg', 'Please enter the network name (SSID)', false);
+                return;
+            }
+
+            // Show warning about IP address change
+            if (!showNetworkChangeWarning(ssid)) return;
+
+            setMsg('wifi_msg', `Connecting to ${ssid}…`, true);
+
+            try {
+                const res = await fetch('/api/thin/network/wifi/connect', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ssid, password })
+                });
+                const data = await res.json();
+
+                if (res.ok && !data.error) {
+                    setMsg('wifi_msg', `Connected to ${ssid}!`, true);
+                    cancelManualWifi();
+                    setTimeout(() => { refreshNetworkStatus(); scanWifi(); }, 2000);
+                } else {
+                    setMsg('wifi_msg', data.error || 'Failed to connect', false);
+                }
+            } catch (e) {
+                setMsg('wifi_msg', e.message, false);
+            }
+        }
+
+        async function connectToWifi() {
+            if (!selectedWifiSSID) return;
+            const password = document.getElementById('wifi_password').value;
+
+            // Show warning about IP address change
+            if (!showNetworkChangeWarning(selectedWifiSSID)) return;
+
+            setMsg('wifi_msg', `Connecting to ${selectedWifiSSID}…`, true);
+
+            try {
+                const res = await fetch('/api/thin/network/wifi/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ssid: selectedWifiSSID, password: password })
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    setMsg('wifi_msg', data.error || 'Connection failed', false);
+                    return;
+                }
+
+                setMsg('wifi_msg', data.message || 'Connected!', true);
+                cancelWifiConnect();
+                // Refresh status and networks
+                setTimeout(() => {
+                    refreshNetworkStatus();
+                    loadSavedNetworks();
+                }, 1000);
+
+            } catch (e) {
+                setMsg('wifi_msg', e.message, false);
+            }
+        }
+
+        async function disconnectWifi() {
+            if (!confirm('Disconnect from WiFi?\n\nMake sure you have Ethernet connected or you may lose access to this page.')) return;
+
+            setMsg('wifi_msg', 'Disconnecting…', true);
+            try {
+                const res = await fetch('/api/thin/network/wifi/disconnect', { method: 'POST' });
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    setMsg('wifi_msg', data.error || 'Disconnect failed', false);
+                    return;
+                }
+
+                setMsg('wifi_msg', 'WiFi disconnected', true);
+                refreshNetworkStatus();
+
+            } catch (e) {
+                setMsg('wifi_msg', e.message, false);
+            }
+        }
+
+        async function loadSavedNetworks() {
+            const container = document.getElementById('saved_networks');
+
+            try {
+                const res = await fetch('/api/thin/network/saved');
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    container.innerHTML = `<div class="small" style="color:#991b1b;">${data.error || 'Failed to load'}</div>`;
+                    return;
+                }
+
+                const conns = data.connections || [];
+                if (!conns.length) {
+                    container.innerHTML = '<div class="small" style="color:#666;">No saved connections</div>';
+                    return;
+                }
+
+                container.innerHTML = conns.map(c => {
+                    const icon = c.type === 'wifi' ? '📶' : (c.type === 'ethernet' ? '🔌' : '🔗');
+                    const activeBadge = c.active ? '<span class="pill" style="background:#d1fae5; color:#065f46; margin-left:8px;">Active</span>' : '';
+                    const forgetBtn = c.type === 'wifi' && !c.active
+                        ? `<button class="btn" style="padding:4px 8px; background:#fee2e2; color:#991b1b;" onclick="forgetNetwork('${escapeAttr(c.name)}')">Forget</button>`
+                        : '';
+                    return `
+                        <div style="padding:8px 0; border-bottom:1px solid #f3f4f6; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <div>${icon} <strong>${escapeHtml(c.name)}</strong> ${activeBadge}</div>
+                            ${forgetBtn}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                container.innerHTML = `<div class="small" style="color:#991b1b;">${e.message}</div>`;
+            }
+        }
+
+        async function forgetNetwork(name) {
+            if (!confirm(`Forget "${name}"?\n\nThis Pi will no longer auto-connect to this network.`)) return;
+
+            try {
+                const res = await fetch('/api/thin/network/wifi/forget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ssid: name })
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    alert(data.error || 'Failed to forget network');
+                    return;
+                }
+
+                loadSavedNetworks();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        // ============= PAGE INITIALIZATION =============
+
+        refreshDiscoveryStatus();
+        loadMappings();
+        // best-effort: if already paired, load station list from cloud to avoid typos
+        refreshCloudStations();
+        // Load network status on page load
+        refreshNetworkStatus();
+        loadSavedNetworks();
+        setInterval(refreshDiscoveryStatus, 10000);
+        // Trigger WiFi rescan in background so first scan shows all networks
+        triggerBackgroundWifiRescan();
+        // Optional auto-detect on load
+        // detectDongles();
+    </script>
+</body>
+</html>

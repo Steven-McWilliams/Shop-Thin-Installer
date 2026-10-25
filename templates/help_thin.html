@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Innosaw Thin Pi - Help</title>
+  <link rel="stylesheet" href="/static/common.css?v=20260408c">
+  <script src="/static/theme.js?v=20260416a"></script>
+  <style>
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .muted { color:var(--text-secondary); font-size: 13px; }
+    .card { background: var(--card-bg); border:1px solid var(--card-border); border-radius: 10px; padding: 16px; box-shadow: 0 2px 8px var(--card-shadow); margin-bottom: 14px; }
+    .h2 { font-size: 18px; font-weight: 900; color:var(--text-primary); margin: 0 0 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>❓ Help (Thin Pi)</h1>
+    <div class="subtitle">Quick setup + mapping walkthrough</div>
+    <div class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/admin">Admin Mapping</a>
+      <a href="/raw_scans">Raw Scans</a>
+      <a class="active" href="/help">Help</a>
+      <a href="{{ cloud_url }}" target="_blank" rel="noopener">Cloud Dashboard</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="h2">Start here</div>
+      <div class="muted">
+        This Thin Pi runs the mapping UI locally and forwards scans to cloud in <span class="mono">thin_mode</span>.
+        Most setup questions are solved by the steps below.
+      </div>
+    </div>
+
+    <div class="card" id="updates">
+      <div class="h2">Software Update (No SSH)</div>
+      <div class="muted">
+        Check GitHub for new Thin Pi code, then apply updates from this page. The service restarts automatically.
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="check_update_btn" class="btn btn-secondary" onclick="checkThinUpdates()">🔎 Check GitHub Updates</button>
+        <button id="run_update_btn" class="btn btn-primary" onclick="runThinUpdate()">⬆️ Update Now</button>
+      </div>
+      <div id="update_status" class="muted" style="margin-top:10px;"></div>
+      <div id="update_msg" class="muted" style="margin-top:8px;"></div>
+      <pre id="update_output" class="mono" style="margin-top:10px; display:none; white-space:pre-wrap; background:var(--bg-secondary); color:var(--text-primary); padding:10px; border:1px solid var(--border-color); border-radius:6px;"></pre>
+    </div>
+
+    <div class="card" id="login">
+      <div class="h2">How to access the Thin Pi UI</div>
+      <div class="muted" style="margin-top:6px;">
+        Replace <span class="mono">&lt;pi-ip&gt;</span> below with the current IP address of this Pi (example: <span class="mono">192.168.68.113</span>).
+        If the IP changes, the links will stop working until you use the new IP.
+      </div>
+      <ul style="margin-top:10px;">
+        <li><strong>Dashboard</strong>: <span class="mono">http://&lt;pi-ip&gt;:5006/</span></li>
+        <li><strong>Admin Mapping</strong>: <span class="mono">http://&lt;pi-ip&gt;:5006/admin</span></li>
+        <li><strong>Raw scans</strong>: <span class="mono">http://&lt;pi-ip&gt;:5006/raw_scans</span></li>
+      </ul>
+      <div class="muted">Tip: for SSH support, keep the username <span class="mono">pi</span> so you can always use <span class="mono">ssh pi@&lt;pi-ip&gt;</span>.</div>
+    </div>
+
+    <div class="card" id="ip">
+      <div class="h2">How to find the Pi IP address (and keep it from changing)</div>
+      <ul style="margin-top:10px;">
+        <li><strong>HDMI method</strong>: plug the Pi into a monitor/TV with HDMI. The IP address will be shown on-screen after boot.</li>
+        <li><strong>Router method</strong>: in your router, look for the device named something like <span class="mono">innosaw</span> or <span class="mono">raspberrypi</span> in the connected devices list.</li>
+        <li><strong>Recommended</strong>: set a <strong>DHCP reservation</strong> (sometimes called “Static DHCP” or “Address reservation”) in the router so the Pi always gets the same IP.</li>
+      </ul>
+      <div class="muted">
+        Why this matters: operators bookmark <span class="mono">http://&lt;pi-ip&gt;:5006/</span>. If the IP changes, bookmarks break.
+      </div>
+    </div>
+
+    <div class="card" id="imager">
+      <div class="h2">If you used a custom image and didn’t see Wi‑Fi/SSH options</div>
+      <div class="muted">
+        In Raspberry Pi Imager, Wi‑Fi/SSH/user settings are under <strong>OS customisation</strong>.
+        Some versions only show it after you click <strong>Next</strong> (then choose <strong>Edit settings</strong>).
+        If you still don’t see it, update Raspberry Pi Imager to the latest version.
+      </div>
+    </div>
+
+    <div class="card" id="install">
+      <div class="h2">Fresh Pi? Install thin mode (one command)</div>
+      <div class="muted">
+        If this Pi was flashed with a normal Raspberry Pi OS image, install the Innosaw Thin service like this:
+      </div>
+      <pre class="mono" style="margin-top:10px; white-space:pre-wrap;">curl -fsSL https://raw.githubusercontent.com/Steven-McWilliams/Shop/main/thin_pi/install_thin_pi.sh -o install_thin_pi.sh
+sudo bash install_thin_pi.sh</pre>
+      <div class="muted" style="margin-top:8px;">
+        If the repo is private, raw GitHub URLs require a token. Use a GitHub PAT or clone the repo through authenticated git before running the installer.
+      </div>
+    </div>
+
+    <div class="card" id="network">
+      <div class="h2">🌐 Network Settings (Web UI - Recommended)</div>
+      <div class="muted">
+        The easiest way to configure WiFi on your Thin Pi — <strong>no terminal or SSH required</strong>.
+      </div>
+      <ol style="margin-top:10px;">
+        <li><strong>Connect via Ethernet first</strong>: Plug an Ethernet cable into the Pi and your router.</li>
+        <li><strong>Find the Pi's IP</strong>: Check your router's connected devices list, or plug in an HDMI monitor to see it.</li>
+        <li><strong>Open the Admin page</strong>: Go to <span class="mono">http://&lt;pi-ip&gt;:5006/admin</span> in your browser.</li>
+        <li><strong>Scroll to "Network Settings"</strong>: You'll see your current connection status.</li>
+        <li><strong>Click "Scan"</strong> under WiFi Networks to find available networks.</li>
+        <li><strong>Click "Connect"</strong> on your WiFi network, enter the password, and click Connect.</li>
+        <li><strong>Unplug Ethernet</strong>: Once WiFi shows as connected, you can remove the Ethernet cable.</li>
+      </ol>
+      <div class="muted" style="margin-top:10px; padding:10px; background:var(--table-warning-bg); color:var(--table-warning-text); border-radius:6px; border:1px solid var(--border-color);">
+        <strong>💡 Tips:</strong>
+        <ul style="margin:4px 0 0 16px; padding:0;">
+          <li>The Pi will auto-reconnect to saved WiFi networks on reboot</li>
+          <li>If you lose WiFi access, plug Ethernet back in to reconfigure</li>
+          <li>You can have both Ethernet and WiFi connected at the same time</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card" id="wifi">
+      <div class="h2">Wi‑Fi setup (Terminal/SSH Methods)</div>
+      <div class="muted">
+        If you prefer terminal commands or can't access the web UI, here are alternative methods.
+      </div>
+      <ol style="margin-top:10px;">
+        <li>
+          <strong>Easiest (no terminal):</strong> re-flash using Raspberry Pi Imager and enter Wi‑Fi in <strong>OS customisation</strong>.
+        </li>
+        <li style="margin-top:8px;">
+          <strong>HDMI method:</strong> plug in a monitor + keyboard and run:
+          <pre class="mono" style="margin-top:8px; white-space:pre-wrap;">sudo nmtui</pre>
+          <div class="muted">This opens a simple text UI to join Wi‑Fi.</div>
+          <div class="muted" style="margin-top:8px;"><strong>nmtui steps</strong> (screenshots can be added later):</div>
+          <ol style="margin-top:6px;">
+            <li>Select <strong>Activate a connection</strong></li>
+            <li>Select your Wi‑Fi network (SSID) → press <strong>Enter</strong></li>
+            <li>Enter the Wi‑Fi password → press <strong>Enter</strong></li>
+            <li>If asked, confirm/OK → then choose <strong>Back</strong> → <strong>Quit</strong></li>
+          </ol>
+          <div class="muted" style="margin-top:8px;">
+            Tip: if you can’t see your network, confirm the Wi‑Fi country/region was set correctly in Pi Imager OS customisation.
+          </div>
+        </li>
+        <li style="margin-top:8px;">
+          <strong>Windows copy/paste (PowerShell):</strong> (requires SSH enabled and the Pi reachable on Ethernet)
+          <div class="muted" style="margin-top:6px;">Replace <span class="mono">&lt;pi-ip&gt;</span>, <span class="mono">&lt;ssid&gt;</span>, <span class="mono">&lt;wifi-password&gt;</span>.</div>
+          <pre class="mono" style="margin-top:8px; white-space:pre-wrap;">ssh pi@&lt;pi-ip&gt; "sudo nmcli dev wifi connect '&lt;ssid&gt;' password '&lt;wifi-password&gt;'"</pre>
+          <div class="muted">If this fails, use the HDMI method above.</div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card" id="order">
+      <div class="h2">Recommended order (cloud → Pi)</div>
+      <ol style="margin-top:10px;">
+        <li>In cloud, create/verify the shop + stations.</li>
+        <li>Generate a <strong>Pairing Code</strong> in Cloud Admin (“Pair a Pi”).</li>
+        <li>On the Pi, plug in the powered hub + dongles.</li>
+        <li>Go to <span class="mono">/admin</span> → Detect dongles → map each device to a station code.</li>
+        <li>Still in <span class="mono">/admin</span>, paste the pairing code → click <strong>Pair</strong>.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="mapping">
+      <div class="h2">Dongle mapping (what to click)</div>
+      <ol style="margin-top:10px;">
+        <li>Open <span class="mono">/admin</span>.</li>
+        <li>Under “Detect USB Dongles”, click <strong>Detect</strong>.</li>
+        <li>For each dongle, click <strong>Use</strong> to copy its device path into the form.</li>
+        <li>Select the correct <strong>Station Code</strong> and click <strong>Save</strong>.</li>
+      </ol>
+      <div class="muted">
+        Use stable device paths (usually <span class="mono">/dev/input/by-path/...</span>). If you move dongles to different USB ports, paths can change.
+      </div>
+    </div>
+
+    <div class="card" id="verify">
+      <div class="h2">Verify forwarding is working</div>
+      <ul style="margin-top:10px;">
+        <li>Scan a label. You should see “Cloud v2 forwarded scan (thin mode)” in logs.</li>
+        <li>On the Pi (SSH): <span class="mono">sudo journalctl -u innosaw-thin -f</span></li>
+      </ul>
+    </div>
+
+    <div class="card" id="more">
+      <div class="h2">More detailed guide</div>
+      <div class="muted">
+        See the full setup guide shipped with the software: <span class="mono">thin_pi/THIN_PI_SETUP_GUIDE.md</span>
+        <br />
+        Cloud reference: <a href="{{ cloud_url.rstrip('/') }}/help#pi" target="_blank" rel="noopener">Cloud Help → Pi units</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let updateCheckCache = null;
+
+    function _setUpdateMessage(text, ok = false) {
+      const msg = document.getElementById('update_msg');
+      if (!msg) return;
+      msg.textContent = text || '';
+      msg.style.color = ok ? '#0a7a2f' : '#b42318';
+    }
+
+    function _setUpdateBusy(isBusy, checkText = '🔎 Check GitHub Updates', updateText = '⬆️ Update Now') {
+      const c = document.getElementById('check_update_btn');
+      const u = document.getElementById('run_update_btn');
+      if (c) {
+        c.disabled = isBusy;
+        c.textContent = checkText;
+      }
+      if (u) {
+        u.disabled = isBusy;
+        u.textContent = updateText;
+      }
+    }
+
+    async function checkThinUpdates() {
+      const status = document.getElementById('update_status');
+      const output = document.getElementById('update_output');
+      _setUpdateBusy(true, '⏳ Checking...', '⬆️ Update Now');
+      _setUpdateMessage('');
+      if (status) status.textContent = 'Checking GitHub...';
+      if (output) {
+        output.style.display = 'none';
+        output.textContent = '';
+      }
+
+      try {
+        const res = await fetch('/api/thin/system/update/check');
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          _setUpdateMessage('❌ ' + (data.error || 'Update check failed'));
+          if (status) status.textContent = '';
+          updateCheckCache = null;
+          return;
+        }
+
+        updateCheckCache = data;
+        const localShort = (data.local_sha || '').slice(0, 8);
+        const remoteShort = (data.remote_sha || '').slice(0, 8);
+        if (data.update_available) {
+          _setUpdateMessage(`✅ Update available on ${data.branch}: ${localShort} → ${remoteShort}`, true);
+        } else {
+          _setUpdateMessage(`✅ Already up to date on ${data.branch} (${localShort})`, true);
+        }
+        if (status) {
+          status.textContent = `Behind: ${data.commits_behind || 0}, Ahead: ${data.commits_ahead || 0}, Files changed: ${data.changed_files_total || 0}`;
+        }
+
+        if (output) {
+          const changed = Array.isArray(data.changed_files) ? data.changed_files : [];
+          const lines = [];
+          lines.push(`Branch: ${data.branch || ''}`);
+          lines.push(`Local:  ${(data.local_sha || '').trim()}`);
+          lines.push(`Remote: ${(data.remote_sha || '').trim()}`);
+          lines.push('');
+          if (!changed.length) {
+            lines.push('No file changes detected.');
+          } else {
+            lines.push(`Changed files (${Math.min(changed.length, 120)} shown):`);
+            for (const f of changed) lines.push(` - ${f}`);
+            if ((data.changed_files_total || 0) > changed.length) {
+              lines.push(`...and ${data.changed_files_total - changed.length} more`);
+            }
+          }
+          output.textContent = lines.join('\n');
+          output.style.display = 'block';
+        }
+      } catch (e) {
+        _setUpdateMessage('❌ Could not reach update API: ' + (e?.message || e));
+        if (status) status.textContent = '';
+        updateCheckCache = null;
+      } finally {
+        _setUpdateBusy(false);
+      }
+    }
+
+    async function runThinUpdate() {
+      const status = document.getElementById('update_status');
+      const output = document.getElementById('update_output');
+
+      if (!updateCheckCache) {
+        await checkThinUpdates();
+      }
+
+      if (updateCheckCache && !updateCheckCache.update_available) {
+        _setUpdateMessage('No update is currently available from GitHub.', true);
+        return;
+      }
+
+      if (!confirm('Install latest Thin Pi update from GitHub now?\n\nThe Thin Pi service will restart and this page may disconnect briefly.')) {
+        return;
+      }
+
+      _setUpdateBusy(true, '🔎 Check GitHub Updates', '⏳ Updating...');
+      _setUpdateMessage('');
+      if (status) status.textContent = 'Applying update...';
+      if (output) {
+        output.style.display = 'none';
+        output.textContent = '';
+      }
+
+      try {
+        const res = await fetch('/api/thin/system/update', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          _setUpdateMessage('❌ ' + (data.error || 'Update failed'));
+          if (status) status.textContent = '';
+          if (output) {
+            output.textContent = data.details || data.error || 'Unknown error';
+            output.style.display = 'block';
+          }
+          return;
+        }
+
+        _setUpdateMessage('✅ ' + (data.message || 'Update complete.'), true);
+        if (status) status.textContent = data.needs_restart ? 'Update finished. Manual restart may still be required.' : 'Update successful. Reconnecting...';
+        if (output && (data.pull_output || data.install_output)) {
+          output.textContent = (data.pull_output || '') + '\n' + (data.install_output || '');
+          output.style.display = 'block';
+        }
+
+        setTimeout(() => {
+          location.reload();
+        }, data.needs_restart ? 2000 : 5000);
+      } catch (e) {
+        _setUpdateMessage('⚠️ Connection lost. The service may be restarting now.');
+        if (status) status.textContent = 'Trying to reconnect...';
+        setTimeout(() => location.reload(), 6000);
+      } finally {
+        _setUpdateBusy(false);
+      }
+    }
+  </script>
+</body>
+</html>
+
+
