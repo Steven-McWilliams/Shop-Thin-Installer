@@ -9,6 +9,7 @@ import time
 import logging
 import logging.handlers
 import threading
+import importlib.util
 import os
 import re
 from datetime import datetime
@@ -1016,6 +1017,12 @@ class QRScanner:
                             break
             if not token:
                 token = (self.config.get("cloud_v2.station_token", "") or "").strip()
+            if (not token) and isinstance(station_tokens, dict) and len(station_tokens) == 1:
+                # Thin pairing can yield a single token before station mappings are finalized.
+                only_val = next(iter(station_tokens.values()), "")
+                if str(only_val or "").strip():
+                    token = str(only_val).strip()
+                    logging.info("Cloud v2 using single available station token fallback.")
             if (not token) and isinstance(station_tokens, dict):
                 logging.warning(
                     "cloud_v2 token lookup miss for station_code='%s'. Available token keys=%s",
@@ -1026,7 +1033,22 @@ class QRScanner:
                 logging.warning("cloud_v2.enabled=true but missing station token(s); forwarding disabled.")
                 return
 
-            from cloud_v2.pi_client import CloudV2Config, CloudV2ScanSink
+            try:
+                from cloud_v2.pi_client import CloudV2Config, CloudV2ScanSink
+            except Exception:
+                # Fallback for legacy/sparse installs where package import fails.
+                pi_client_path = (BASE_DIR / 'cloud_v2' / 'pi_client.py').resolve()
+                if not pi_client_path.exists():
+                    raise RuntimeError(
+                        f"Missing cloud client at {pi_client_path}. Re-run install_thin_pi.sh to refresh sparse checkout."
+                    )
+                spec = importlib.util.spec_from_file_location('cloud_v2_pi_client', str(pi_client_path))
+                if spec is None or spec.loader is None:
+                    raise RuntimeError(f"Unable to load cloud client module from {pi_client_path}")
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                CloudV2Config = getattr(mod, 'CloudV2Config')
+                CloudV2ScanSink = getattr(mod, 'CloudV2ScanSink')
 
             queue_path = (self.config.get("cloud_v2.queue_path", "") or "").strip()
             if queue_path:
