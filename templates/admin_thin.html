@@ -140,6 +140,19 @@
         </div>
 
         <div class="card">
+            <h2>Pairing / Discovery Controls</h2>
+            <div class="small">Use these controls to re-enter discovery mode, clear pairing, or stop discovery without SSH.</div>
+            <div id="pair_ctl_status" class="small" style="margin-top:8px;">Loading pairing status…</div>
+            <div class="row" style="margin-top:10px;">
+                <button class="btn btn-secondary" onclick="refreshPairingStatus()">Refresh Status</button>
+                <button class="btn btn-secondary" onclick="setDiscoveryMode(true)">Enable Discovery Mode</button>
+                <button class="btn btn-secondary" onclick="setDiscoveryMode(false)">Disable Discovery Mode</button>
+                <button class="btn" style="background:#7f1d1d;" onclick="clearPairingState()">Clear Pairing + Discover</button>
+            </div>
+            <div class="msg" id="pair_ctl_msg"></div>
+        </div>
+
+        <div class="card">
             <h2>Raw Scan Data</h2>
             <div class="small">View / download raw scans locally (no cloud parsing).</div>
             <div class="row" style="margin-top:10px;">
@@ -562,8 +575,72 @@
                 document.getElementById('pair_code').value = '';
                 // Refresh station list from cloud so dropdowns match (avoid typos)
                 await refreshCloudStations();
+                await refreshPairingStatus();
             } catch (e) {
                 setMsg('pair_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        async function refreshPairingStatus() {
+            const el = document.getElementById('pair_ctl_status');
+            if (!el) return;
+            try {
+                const res = await fetch('/api/thin/pairing/status');
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    el.textContent = data.error || 'Failed to load pairing status.';
+                    return;
+                }
+                const pairedTxt = data.paired ? 'paired' : 'not paired';
+                const forceTxt = data.force_discovery ? 'on' : 'off';
+                const base = data.base_url || '(none)';
+                const station = data.station_code || '(unset)';
+                el.textContent = `Status: ${pairedTxt}. discovery override: ${forceTxt}. station: ${station}. base URL: ${base}`;
+            } catch (e) {
+                el.textContent = 'Pairing status unavailable.';
+            }
+        }
+
+        async function setDiscoveryMode(enabled) {
+            setMsg('pair_ctl_msg', enabled ? 'Enabling discovery mode…' : 'Disabling discovery mode…', true);
+            try {
+                const res = await fetch('/api/thin/discovery_mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !!enabled })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('pair_ctl_msg', data.error || 'Failed to change discovery mode.', false);
+                    return;
+                }
+                setMsg('pair_ctl_msg', 'Discovery mode updated. Restart Thin service (or use Reboot button) for broadcast changes to take effect.', true);
+                await refreshPairingStatus();
+                await refreshDiscoveryStatus();
+            } catch (e) {
+                setMsg('pair_ctl_msg', 'Error: ' + e.message, false);
+            }
+        }
+
+        async function clearPairingState() {
+            if (!confirm('Clear cloud pairing tokens on this Pi and force discovery mode?')) return;
+            setMsg('pair_ctl_msg', 'Clearing pairing…', true);
+            try {
+                const res = await fetch('/api/thin/pairing/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable_discovery: true })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    setMsg('pair_ctl_msg', data.error || 'Failed to clear pairing.', false);
+                    return;
+                }
+                setMsg('pair_ctl_msg', 'Pairing cleared. Restart Thin service (or use Reboot button) to begin broadcasting discovery again.', true);
+                await refreshPairingStatus();
+                await refreshDiscoveryStatus();
+            } catch (e) {
+                setMsg('pair_ctl_msg', 'Error: ' + e.message, false);
             }
         }
 
@@ -1145,6 +1222,7 @@ Do you want to proceed with connecting to ${newSSID}?`;
         // ============= PAGE INITIALIZATION =============
 
         refreshDiscoveryStatus();
+        refreshPairingStatus();
         loadMappings();
         // best-effort: if already paired, load station list from cloud to avoid typos
         refreshCloudStations();

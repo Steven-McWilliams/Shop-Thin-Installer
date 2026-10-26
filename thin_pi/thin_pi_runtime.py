@@ -45,9 +45,23 @@ def _load_config() -> dict:
         return {}
 
 
+def _force_discovery_config(cfg: dict | None = None) -> bool:
+    if cfg is None:
+        cfg = _load_config()
+    if not isinstance(cfg, dict):
+        return False
+    thin_cfg = cfg.get("thin") if isinstance(cfg.get("thin"), dict) else {}
+    if bool(thin_cfg.get("force_discovery", False)):
+        return True
+    return bool(cfg.get("force_discovery", False))
+
+
 def _is_paired_config() -> bool:
     cfg = _load_config()
     if not isinstance(cfg, dict):
+        return False
+
+    if _force_discovery_config(cfg):
         return False
 
     if cfg.get("paired_cloud_shop_id") or cfg.get("paired_at"):
@@ -83,7 +97,10 @@ def _get_device_identity() -> dict:
         tmp.close()
     except Exception:
         lan_ip = ""
+    cfg = _load_config()
+    force_discovery = _force_discovery_config(cfg)
     paired = _is_paired_config()
+    discovery_mode = bool(force_discovery or (not paired))
     return {
         "device_id": hostname,
         "hostname": hostname,
@@ -91,8 +108,8 @@ def _get_device_identity() -> dict:
         "product": "thin-pi",
         "version": os.environ.get("INNOSAW_VERSION", "unknown"),
         "kind": "thin-pi-discovery",
-        "state": "paired" if paired else "discovery",
-        "discovery_mode": not paired,
+        "state": "discovery" if discovery_mode else "paired",
+        "discovery_mode": discovery_mode,
         "ip": lan_ip,
     }
 
@@ -159,10 +176,12 @@ def main() -> int:
 
     discovery_thread = None
     try:
+        cfg = _load_config()
         paired = _is_paired_config()
-        if paired:
+        force_discovery = _force_discovery_config(cfg)
+        if paired and not force_discovery:
             os.environ["INNOSAW_DISCOVERY_DISABLE"] = "1"
-        if (not paired) and os.environ.get("INNOSAW_DISCOVERY_DISABLE", "0").strip().lower() not in {"1", "true", "yes"}:
+        if force_discovery or ((not paired) and os.environ.get("INNOSAW_DISCOVERY_DISABLE", "0").strip().lower() not in {"1", "true", "yes"}):
             discovery_thread = threading.Thread(
                 target=_broadcast_discovery_loop,
                 args=(stop_event,),

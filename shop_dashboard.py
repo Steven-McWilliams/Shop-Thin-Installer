@@ -3078,6 +3078,119 @@ def thin_clear_local_data():
     return jsonify({'success': True, 'deleted': deleted, 'missing': missing, 'errors': errors}), (200 if not errors else 207)
 
 
+def _restart_scanners_after_config_change() -> None:
+    """Best-effort scanner restart after config updates that affect cloud/pairing behavior."""
+    try:
+        mgr = getattr(app, 'scanner_manager', None)
+        if mgr and hasattr(mgr, 'restart_scanner'):
+            for device_path in list(getattr(mgr, 'scanners', {}).keys()):
+                try:
+                    mgr.restart_scanner(device_path)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+
+@app.route('/api/pair/claim', methods=['POST'])
+def pair_claim_compat():
+    """Backward-compatible alias for older Pi/client flows that still call /api/pair/claim."""
+    return thin_pair_claim()
+
+
+@app.route('/api/thin/pairing/status', methods=['GET'])
+def thin_pairing_status():
+    if _auth_enabled() and _current_role(session) != 'admin':
+        return jsonify({'error': 'Not authorized. Admin password required.', 'required_role': 'admin'}), 403
+
+    cfg_path = _config_path()
+    cfg = {}
+    if cfg_path.exists():
+        try:
+            with open(cfg_path, 'r') as f:
+                cfg = json.load(f) or {}
+        except Exception:
+            cfg = {}
+    cloud = cfg.get('cloud_v2', {}) if isinstance(cfg.get('cloud_v2'), dict) else {}
+    thin_cfg = cfg.get('thin', {}) if isinstance(cfg.get('thin'), dict) else {}
+    tokens = cloud.get('station_tokens') if isinstance(cloud.get('station_tokens'), dict) else {}
+    paired = bool(cfg.get('paired_cloud_shop_id') or cfg.get('paired_at') or (tokens and len(tokens) > 0) or str(cloud.get('station_token') or '').strip())
+
+    return jsonify({
+        'paired': paired,
+        'paired_cloud_shop_id': cfg.get('paired_cloud_shop_id'),
+        'paired_at': cfg.get('paired_at'),
+        'base_url': cloud.get('base_url') or '',
+        'station_code': cfg.get('station_code') or '',
+        'station_token_count': len(tokens),
+        'force_discovery': bool(thin_cfg.get('force_discovery', False)),
+    }), 200
+
+
+@app.route('/api/thin/pairing/clear', methods=['POST'])
+def thin_pairing_clear():
+    if _auth_enabled() and _current_role(session) != 'admin':
+        return jsonify({'error': 'Not authorized. Admin password required.', 'required_role': 'admin'}), 403
+
+    body = request.get_json(silent=True) or {}
+    enable_discovery = bool(body.get('enable_discovery', True))
+
+    try:
+        cfg_path = _config_path()
+        cfg = {}
+        if cfg_path.exists():
+            with open(cfg_path, 'r') as f:
+                cfg = json.load(f) or {}
+
+        cloud = cfg.get('cloud_v2', {}) if isinstance(cfg.get('cloud_v2'), dict) else {}
+        cloud['enabled'] = False
+        cloud['station_tokens'] = {}
+        cloud['station_token'] = ''
+        cfg['cloud_v2'] = cloud
+
+        cfg.pop('paired_cloud_shop_id', None)
+        cfg.pop('paired_at', None)
+
+        thin_cfg = cfg.get('thin', {}) if isinstance(cfg.get('thin'), dict) else {}
+        thin_cfg['force_discovery'] = bool(enable_discovery)
+        cfg['thin'] = thin_cfg
+
+        with open(cfg_path, 'w') as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        return jsonify({'error': f'Failed updating config.json: {e}'}), 500
+
+    _restart_scanners_after_config_change()
+    return jsonify({'success': True, 'force_discovery': bool(enable_discovery), 'needs_restart': True}), 200
+
+
+@app.route('/api/thin/discovery_mode', methods=['POST'])
+def thin_discovery_mode():
+    if _auth_enabled() and _current_role(session) != 'admin':
+        return jsonify({'error': 'Not authorized. Admin password required.', 'required_role': 'admin'}), 403
+
+    body = request.get_json(silent=True) or {}
+    enabled = bool(body.get('enabled', False))
+
+    try:
+        cfg_path = _config_path()
+        cfg = {}
+        if cfg_path.exists():
+            with open(cfg_path, 'r') as f:
+                cfg = json.load(f) or {}
+
+        thin_cfg = cfg.get('thin', {}) if isinstance(cfg.get('thin'), dict) else {}
+        thin_cfg['force_discovery'] = enabled
+        cfg['thin'] = thin_cfg
+
+        with open(cfg_path, 'w') as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        return jsonify({'error': f'Failed updating discovery mode: {e}'}), 500
+
+    return jsonify({'success': True, 'force_discovery': enabled, 'needs_restart': True}), 200
+
+
 @app.route('/api/thin/pair/claim', methods=['POST'])
 def thin_pair_claim():
     """Thin Pi: claim a one-time pairing code from cloud and store station tokens locally."""
@@ -3148,22 +3261,18 @@ def thin_pair_claim():
         cfg['cloud_v2'] = cloud
         cfg['paired_cloud_shop_id'] = data.get('shop_id')
         cfg['paired_at'] = datetime.now().isoformat()
+        if not str(cfg.get('station_code') or '').strip() and station_tokens:
+            cfg['station_code'] = sorted(station_tokens.keys())[0]
+        thin_cfg = cfg.get('thin', {}) if isinstance(cfg.get('thin'), dict) else {}
+        thin_cfg['force_discovery'] = False
+        cfg['thin'] = thin_cfg
         with open(cfg_path, 'w') as f:
             json.dump(cfg, f, indent=2)
     except Exception as e:
         return jsonify({'error': f'Failed saving config.json: {e}'}), 500
 
     # Apply immediately: token changes don't trigger the config delta watcher, so restart scanners.
-    try:
-        mgr = getattr(app, 'scanner_manager', None)
-        if mgr and hasattr(mgr, 'restart_scanner'):
-            for device_path in list(getattr(mgr, 'scanners', {}).keys()):
-                try:
-                    mgr.restart_scanner(device_path)
-                except Exception:
-                    continue
-    except Exception:
-        pass
+    _restart_scanners_after_config_change()
 
     return jsonify({'success': True, 'station_tokens': station_tokens, 'shop_id': data.get('shop_id')}), 200
 
