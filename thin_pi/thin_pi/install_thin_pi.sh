@@ -68,6 +68,7 @@ if [[ ! -d "${INSTALL_DIR}/.git" ]]; then
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/update_pi.sh \
       /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
@@ -99,6 +100,7 @@ else
       /config.example.json \
       /thin_pi/THIN_PI_SETUP_GUIDE.md \
       /thin_pi/thin_pi_runtime.py \
+      /thin_pi/update_pi.sh \
       /thin_pi/thin_pi/update_pi.sh \
       /thin_pi/requirements.txt \
       /thin_pi/innosaw-thin.service \
@@ -113,7 +115,12 @@ sudo -u "${PI_USER}" bash -lc "
   python3 -m venv .venv
   source .venv/bin/activate
   pip install --upgrade pip
-  pip install -r thin_pi/requirements.txt
+  pip cache purge >/dev/null 2>&1 || true
+  if ! pip install --no-cache-dir -r thin_pi/requirements.txt; then
+    echo 'Primary dependency install failed; retrying with evdev source build fallback...'
+    pip install --no-cache-dir --no-binary evdev evdev==1.6.1
+    pip install --no-cache-dir -r thin_pi/requirements.txt
+  fi
 "
 
 echo "[5/7] Default config (if missing)"

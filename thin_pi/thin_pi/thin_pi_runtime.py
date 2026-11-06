@@ -151,6 +151,10 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(repo_root))
 
+    # Thin runtime must always render thin UI templates, even if config values drift.
+    os.environ.setdefault("INNOSAW_THIN_MODE", "1")
+    os.environ.setdefault("INNOSAW_CONFIG_PATH", "config.json")
+
     # Import late so sys.path is ready
     from multi_scanner_manager import MultiScannerManager
     import shop_dashboard

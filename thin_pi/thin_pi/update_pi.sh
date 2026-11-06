@@ -54,11 +54,19 @@ echo "[2/4] Updating Python dependencies"
 if [[ -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
   "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip >/dev/null 2>&1 || true
   if [[ -f "${INSTALL_DIR}/thin_pi/requirements.txt" ]]; then
-    "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/thin_pi/requirements.txt"
+    "${INSTALL_DIR}/.venv/bin/pip" cache purge >/dev/null 2>&1 || true
+    if ! "${INSTALL_DIR}/.venv/bin/pip" install --no-cache-dir -r "${INSTALL_DIR}/thin_pi/requirements.txt"; then
+      echo "Primary dependency install failed; retrying with evdev source build fallback..."
+      "${INSTALL_DIR}/.venv/bin/pip" install --no-cache-dir --no-binary evdev evdev==1.6.1
+      "${INSTALL_DIR}/.venv/bin/pip" install --no-cache-dir -r "${INSTALL_DIR}/thin_pi/requirements.txt"
+    fi
   fi
 fi
 
 echo "[3/4] Restarting Thin Pi service"
+if [[ -f "${INSTALL_DIR}/thin_pi/innosaw-thin.service" ]]; then
+  sudo cp "${INSTALL_DIR}/thin_pi/innosaw-thin.service" "/etc/systemd/system/${SERVICE_NAME}.service" || true
+fi
 sudo systemctl daemon-reload || true
 if sudo systemctl restart "${SERVICE_NAME}" >/dev/null 2>&1; then
   echo "Restarted ${SERVICE_NAME}"

@@ -19,6 +19,8 @@ config.example.json
 thin_pi/README.md
 thin_pi/THIN_PI_SETUP_GUIDE.md
 thin_pi/thin_pi_runtime.py
+thin_pi/update_pi.sh
+thin_pi/thin_pi/update_pi.sh
 thin_pi/requirements.txt
 thin_pi/innosaw-thin.service
 thin_pi/install_thin_pi.sh
