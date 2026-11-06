@@ -9,6 +9,8 @@ User=pi
 Group=pi
 WorkingDirectory=/home/pi/qr-system
 EnvironmentFile=-/etc/innosaw-thin.env
+Environment=INNOSAW_THIN_MODE=1
+Environment=INNOSAW_CONFIG_PATH=config.json
 
 Restart=always
 RestartSec=2
